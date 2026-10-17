@@ -2,6 +2,7 @@
 import io
 import json
 import math
+from functools import lru_cache
 
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -10,6 +11,22 @@ FONDO, TEXTO, TEXTO_2 = "#1a1a19", "#f0efec", "#c3c2b7"
 # Paleta categórica validada para fondo oscuro (CVD y contraste). El color sigue al dev, no a su puesto.
 COLORES = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
 R = 120  # radio de cada torta
+
+
+@lru_cache
+def avatar(login, lado):
+    """Foto de perfil de GitHub recortada en círculo; None si no se puede bajar (la torta sale igual)."""
+    try:
+        r = requests.get(f"https://github.com/{login}.png", params={"size": lado * 2}, timeout=10)
+        r.raise_for_status()
+        foto = Image.open(io.BytesIO(r.content)).convert("RGB").resize((lado, lado), Image.LANCZOS)
+    except (requests.RequestException, OSError):
+        return None
+    # Máscara dibujada a 4x y reducida: borde suave.
+    mascara = Image.new("L", (lado * 4, lado * 4))
+    ImageDraw.Draw(mascara).ellipse((0, 0, lado * 4 - 1, lado * 4 - 1), fill=255)
+    foto.putalpha(mascara.resize((lado, lado), Image.LANCZOS))
+    return foto
 
 
 def _torta(d, cx, cy, titulo, pct, color):
