@@ -3,6 +3,23 @@ import re
 from datetime import datetime, time, timedelta
 
 REF_ISSUE = re.compile(r"(?<![\w/])#(\d+)\b")
+ETIQUETA_PESO = re.compile(r"peso:\s*(\d+(?:\.\d+)?)$", re.I)
+
+
+def peso_de(etiquetas):
+    """Peso desde etiquetas `peso:N` (si hay varias, la mayor) y si lleva `bug`."""
+    nombres = [e["name"] for e in etiquetas]
+    pesos = [float(m.group(1)) for n in nombres if (m := ETIQUETA_PESO.match(n))]
+    return (max(pesos) if pesos else None), any(n.casefold() == "bug" for n in nombres)
+
+
+def issues(gh, repo):
+    """{número: (peso, bug, título)} de todos los Issues del repo (sin PRs)."""
+    return {
+        i["number"]: (*peso_de(i["labels"]), i["title"])
+        for i in gh.paginar(f"/repos/{repo}/issues", state="all")
+        if "pull_request" not in i
+    }
 RAMA_ISSUE = re.compile(r"(?:issue[-_]?)?(\d+)(?:[-_]|$)", re.I)
 
 
