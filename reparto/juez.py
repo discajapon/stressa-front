@@ -177,7 +177,7 @@ def _juzgar(cfg, sistema, usuario, refs, issues):
     for _ in range(3):
         aviso = f"\n\nTu respuesta anterior no era válida: {error}. Corrígela." if error else ""
         try:
-            return validar(completar(cfg, sistema, usuario + aviso, ESQUEMA), refs, issues)
+            return validar(completar(cfg, sistema, usuario + aviso, ESQUEMA, RESERVA_SALIDA), refs, issues)
         except (ValueError, KeyError, TypeError) as e:
             error = str(e)
     raise RuntimeError(f"el juez devolvió una salida inválida 3 veces: {error}")
