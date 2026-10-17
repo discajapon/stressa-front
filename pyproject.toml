@@ -3,7 +3,7 @@ name = "reparto"
 version = "0.1.0"
 description = "Reparto Discayama: reparto diario por contribución real, evaluada por un LLM"
 requires-python = ">=3.12"
-dependencies = ["requests"]
+dependencies = ["requests", "Pillow"]
 
 [project.scripts]
 reparto = "reparto.cli:main"
