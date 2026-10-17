@@ -42,7 +42,9 @@ reparto ver 2026-10-16              # qué aportó cada dev, qué se descartó y
   los cambios, con la fecha en que se vieron.
 - Cada commit se vincula a Issues por `#N` en el mensaje o en su PR, o por el
   número al inicio de la rama (`12-login`, `feat/12-login`, `issue-12`).
-- Si una cuenta no está en `[devs]`, el aporte aparece como `(sin dev)`.
+- Cada dev aparece con **su cuenta de GitHub**, tomada del autor del commit o de la review.
+  Si GitHub no vincula el email de un commit a ninguna cuenta, se añade en `[emails]`.
+  Los bots (`dependabot[bot]`, etc.) se guardan pero no cuentan.
 
 ## Qué no suma (ruido)
 
@@ -67,6 +69,9 @@ Un solo modelo, configurado en `[llm]`. El prompt está versionado en
 `reparto/prompts/juez_v1.md`; cada evaluación guarda la versión y el hash del
 prompt, el modelo y un hash de sus entradas.
 
+- Usar IA para programar es totalmente válido: el juez lo sabe y no lo penaliza.
+- `codigo` cubre todo trabajo que construye el proyecto (funcionalidad, interfaz,
+  infraestructura, CI, despliegue, scripts, documentación entregable), no solo código.
 - Recibe, por dev y día, cada aporte útil con su Issue, su diff y el archivo completo
   tras el cambio (leído de GitHub en el momento, no se guarda). No recibe el nombre del dev.
 - Devuelve por aporte: categoría (`codigo`, `bug`, `tests`, `simplificacion`, `review`,
