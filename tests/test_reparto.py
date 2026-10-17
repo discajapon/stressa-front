@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from reparto.recolectar import atribuir, dia_cerrado, refs_issues, ventana
+from reparto.recolectar import atribuir, dia_cerrado, peso_de, refs_issues, ventana
 from reparto.ruido import clasificar
 
 GYE = ZoneInfo("America/Guayaquil")  # UTC-5
@@ -69,6 +69,13 @@ def test_atribuir():
 def test_refs_issues():
     assert refs_issues(["Arregla login (#12)", "closes #3, ver a/b#9"], ["feat/7-pago", "main", "v2"]) == {12, 3, 7}
     assert refs_issues(["sin issue"], ["issue-40"]) == {40}
+
+
+def test_peso_de():
+    e = lambda *ns: [{"name": n} for n in ns]
+    assert peso_de(e("peso:5", "frontend")) == (5.0, False)
+    assert peso_de(e("Peso: 2.5", "peso:8", "Bug")) == (8.0, True)
+    assert peso_de(e("bugfix")) == (None, False)
 
 
 if __name__ == "__main__":
