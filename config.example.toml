@@ -1,0 +1,20 @@
+# Copiar fuera del repo (por defecto /etc/reparto/config.toml, o la ruta en REPARTO_CONFIG).
+# Las credenciales NO van aquí: GITHUB_TOKEN se lee del entorno.
+
+db = "/var/lib/reparto/reparto.db"
+zona = "America/Guayaquil"
+corte = "00:00"   # hora local en que se cierra cada día
+
+[[proyecto]]
+repo = "Discayama/cliente-x"
+inicio = "2026-10-01"   # nada anterior a esta fecha cuenta para el proyecto
+
+# Cuenta de GitHub = nombre que se muestra en el reparto.
+[devs]
+disca_japon = "Disca"
+# otra-cuenta = "Dev 2"
+# tercera-cuenta = "Dev 3"
+
+# Emails de commit que GitHub no vincula a ninguna cuenta = cuenta de GitHub.
+[emails]
+# "disca@pc-casa.local" = "disca_japon"
