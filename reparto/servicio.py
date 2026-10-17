@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 import requests
 
 from .calculo import acumulado, porcentajes, puntos_dia, puntos_juicios
-from .discord import enviar, imagen
+from .discord import COLOR_AVISO, enviar, imagen
 from .juez import evaluar_dia
 from .llm import Caido
 from .db import guardar_pesos, proyectos
@@ -55,15 +55,15 @@ def publicar(cfg, con, repo, dia, encabezado=None):
         _estado(con, repo, dia, "sin_puntos")
         return False
     pct_total = porcentajes(acumulado(con, repo, dia))
-    lineas = [encabezado or f"**Reparto del {dia:%d/%m/%Y}** · {repo}",
-              f"Hoy: {texto_pct(pct_dia)}",
-              f"Proyecto: {texto_pct(pct_total)}"]
+    lineas = [f"**Hoy:** {texto_pct(pct_dia)}",
+              f"**Proyecto:** {texto_pct(pct_total)}", ""]
     lineas += [f"· {dev}: {r}" for dev, r in _resumen(con, ev).items()]
     sin_issue = con.execute(
         "SELECT count(*) FROM juicios WHERE evaluacion=? AND issue IS NULL AND categoria<>'ruido'", (ev,)).fetchone()[0]
     if sin_issue:
         lineas.append(f"⚠ {sin_issue} aporte(s) sin Issue: el peso lo estimó el juez (`reparto ver {dia}`).")
-    enviar(cfg, "\n".join(lineas), imagen(dia, pct_dia, pct_total, _devs(con, repo)))
+    enviar(cfg, encabezado or f"Reparto del {dia:%d/%m/%Y}", "\n".join(lineas),
+           imagen(dia, pct_dia, pct_total, _devs(con, repo)), pie=repo)
     _estado(con, repo, dia, "publicado")
     return True
 
@@ -102,8 +102,9 @@ def tick(cfg, gh, con, ahora=None):
                     evaluar_dia(cfg, gh, con, p.repo, dia)
                 except Caido:
                     if estado != "pendiente_juez":
-                        enviar(cfg, f"⏳ El reparto del {dia:%d/%m/%Y} ({p.repo}) está pendiente: el supercomputador "
-                                    "no responde. Se evaluará en cuanto vuelva, con el mismo juez.")
+                        enviar(cfg, f"⏳ Reparto del {dia:%d/%m/%Y} pendiente",
+                               "El supercomputador no responde. El día se evaluará en cuanto vuelva, con el mismo juez.",
+                               color=COLOR_AVISO, pie=p.repo)
                         _estado(con, p.repo, dia, "pendiente_juez")
                     break
                 _estado(con, p.repo, dia, "evaluado")
@@ -125,12 +126,12 @@ def disputa(cfg, con, repo, dia, dev, nuevo, motivo):
                 (ev, dev, pts[dev], nuevo, motivo, _ahora()))
     con.commit()
     despues_dia, despues_total = porcentajes(puntos_dia(con, ev)), porcentajes(acumulado(con, repo, date.max))
-    enviar(cfg, "\n".join([
-        f"⚖️ **Disputa del {dia:%d/%m/%Y}** · {repo}: se corrigió la evaluación de {dev}.",
-        f"Motivo: {motivo}",
-        f"Día: {texto_pct(antes_dia)}  →  {texto_pct(despues_dia)}",
-        f"Proyecto: {texto_pct(antes_total)}  →  {texto_pct(despues_total)}",
-    ]))
+    enviar(cfg, f"⚖️ Disputa del {dia:%d/%m/%Y}", "\n".join([
+        f"Se corrigió la evaluación de **{dev}**.",
+        f"**Motivo:** {motivo}",
+        f"**Día:** {texto_pct(antes_dia)}  →  {texto_pct(despues_dia)}",
+        f"**Proyecto:** {texto_pct(antes_total)}  →  {texto_pct(despues_total)}",
+    ]), color=COLOR_AVISO, pie=repo)
     return pts[dev]
 
 
@@ -147,7 +148,7 @@ def reevaluar(cfg, gh, con, repo, dia):
         raise SystemExit(f"El {dia} no tiene aportes útiles en {repo}")
     version = con.execute("SELECT version FROM evaluaciones WHERE id=?", (ev,)).fetchone()[0]
     publicar(cfg, con, repo, dia, encabezado=(
-        f"🔁 **Reevaluación del {dia:%d/%m/%Y}** · {repo} (versión {version}; las anteriores quedan en el historial)"))
+        f"🔁 Reevaluación del {dia:%d/%m/%Y} (versión {version}; las anteriores quedan en el historial)"))
 
 
 URL_REPO = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$")
@@ -180,8 +181,8 @@ def cambiar(cfg, gh, con, url, por):
 
 def anunciar_cambio(cfg, con, repo, cerrados, por):
     """Anuncia en Discord el proyecto nuevo y el reparto final de los que se cerraron."""
-    lineas = [f"📦 **Proyecto activo: {repo}** desde hoy, {datetime.now(cfg.zona):%d/%m/%Y} (cambiado por {por})."]
+    lineas = [f"Cuenta desde hoy, {datetime.now(cfg.zona):%d/%m/%Y}. Cambiado por {por}."]
     for viejo in cerrados:
         final = porcentajes(acumulado(con, viejo, date.max))
-        lineas.append(f"Se cerró {viejo}. Reparto final del proyecto: {texto_pct(final) or 'sin puntos'}")
-    enviar(cfg, "\n".join(lineas))
+        lineas.append(f"Se cerró **{viejo}**. Reparto final: {texto_pct(final) or 'sin puntos'}")
+    enviar(cfg, f"📦 Proyecto activo: {repo}", "\n".join(lineas))
