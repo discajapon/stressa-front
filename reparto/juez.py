@@ -59,3 +59,50 @@ def validar(salida, refs, issues):
     if faltan := set(refs) - {e["ref"] for e in limpias}:
         raise ValueError(f"aportes sin evaluar: {sorted(faltan)}")
     return limpias
+
+
+def _ajustar(txt, completo, limite):
+    """Archivo con su contenido completo si cabe; si no, solo el diff; si ni eso, el diff recortado."""
+    con_completo = f"{txt}Archivo completo tras el cambio:\n```\n{completo}\n```\n" if completo else txt
+    if len(con_completo) <= limite:
+        return con_completo
+    nota = "(archivo completo omitido por tamaño)\n"
+    if len(txt) + len(nota) <= limite:
+        return txt + nota
+    nota = "\n…(diff recortado por tamaño)\n"
+    return txt[:max(limite - len(nota), 0)] + nota
+
+
+def trozos(aportes, limite):
+    """Reparte aportes [(ref, cabecera, [(texto, completo)])] en trozos de ≤ `limite` caracteres.
+
+    Determinista: mismo orden y mismos cortes para las mismas entradas. Un aporte que
+    no cabe solo se parte por archivos, repitiendo su cabecera con la marca (fragmento).
+    Devuelve [(texto, refs del trozo)].
+    """
+    salida, texto, refs = [], "", []
+
+    def meter(bloque, ref):
+        nonlocal texto, refs
+        if texto and len(texto) + len(bloque) > limite:
+            salida.append((texto, refs))
+            texto, refs = "", []
+        texto += bloque
+        if ref not in refs:
+            refs.append(ref)
+
+    for ref, cab, archivos in aportes:
+        partes = [_ajustar(t, c, limite - len(cab) - 20) for t, c in archivos]
+        if len(cab) + sum(map(len, partes)) <= limite:
+            meter(cab + "".join(partes), ref)
+            continue
+        grupo = ""
+        for p in partes:
+            if grupo and len(cab) + 13 + len(grupo) + len(p) > limite:
+                meter(f"{cab}(fragmento)\n{grupo}", ref)
+                grupo = ""
+            grupo += p
+        meter(f"{cab}(fragmento)\n{grupo}", ref)
+    if texto:
+        salida.append((texto, refs))
+    return salida
