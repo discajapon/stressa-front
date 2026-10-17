@@ -1,0 +1,14 @@
+[Unit]
+Description=Reparto Discayama: una vuelta (recoger, evaluar en orden, publicar)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# oneshot: el timer no lanza otra vuelta mientras esta siga corriendo.
+Type=oneshot
+User=reparto
+# GITHUB_TOKEN, LLM_CLAVE y DISCORD_WEBHOOK; archivo con permisos 600, fuera del repo.
+EnvironmentFile=/etc/reparto/env
+ExecStart=/opt/reparto/.venv/bin/reparto tick
+# El juez con razonamiento puede tardar en días grandes.
+TimeoutStartSec=3h
