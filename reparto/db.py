@@ -26,6 +26,25 @@ CREATE TABLE IF NOT EXISTS pesos (
     repo TEXT, issue INTEGER, peso REAL, bug INTEGER, titulo TEXT,
     desde TEXT  -- día en que se vio este valor por primera vez
 );
+-- Cada evaluación de un día es una versión; solo una vigente. Las anteriores se conservan.
+CREATE TABLE IF NOT EXISTS evaluaciones (
+    id INTEGER PRIMARY KEY,
+    repo TEXT, dia TEXT, version INTEGER,
+    hash TEXT,          -- de las entradas: aportes, pesos, prompt y modelo
+    prompt TEXT,        -- versión del prompt y hash de su texto
+    modelo TEXT,
+    creada TEXT,
+    vigente INTEGER
+);
+CREATE TABLE IF NOT EXISTS juicios (
+    evaluacion INTEGER REFERENCES evaluaciones (id),
+    dev TEXT, ref TEXT, tipo TEXT,
+    categoria TEXT,
+    issue INTEGER,      -- NULL = sin Issue
+    peso REAL,          -- peso vigente del Issue, o el estimado por el juez si no hay Issue
+    avance REAL, calidad REAL,
+    razonamiento TEXT
+);
 """
 
 
