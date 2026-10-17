@@ -17,4 +17,4 @@ build-backend = "setuptools.build_meta"
 packages = ["reparto"]
 
 [tool.setuptools.package-data]
-reparto = ["prompts/*.md"]
+reparto = ["prompts/*.md", "fuentes/*"]
