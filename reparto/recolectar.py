@@ -32,12 +32,17 @@ def issues(gh, repo):
 RAMA_ISSUE = re.compile(r"(?:issue[-_]?)?(\d+)(?:[-_]|$)", re.I)
 
 
+def dev_de(login):
+    """El dev se muestra con su cuenta de GitHub; los bots (dependabot, etc.) no cuentan."""
+    return login if login and not login.endswith("[bot]") else None
+
+
 def atribuir(commit, cfg):
-    """(cuenta de GitHub, nombre del dev) del autor; el dev es None si no está mapeado."""
+    """(cuenta de GitHub, dev) del autor del commit; la cuenta sale del email si GitHub no la vincula."""
     login = (commit.get("author") or {}).get("login")
     if not login:
         login = cfg.emails.get(commit["commit"]["author"]["email"].casefold())
-    return login, cfg.devs.get(login)
+    return login, dev_de(login)
 
 
 def refs_issues(textos, ramas):
@@ -149,7 +154,7 @@ def guardar_reviews(gh, con, cfg, repo, dia, ini, fin, pesos):
             con.execute(
                 "INSERT OR IGNORE INTO aportes (repo, dia, tipo, ref, login, dev, fecha, patch_id, issues, ruido, detalle)"
                 " VALUES (?, ?, 'review', ?, ?, ?, ?, NULL, ?, ?, ?)",
-                (repo, str(dia), str(r["id"]), login, cfg.devs.get(login), r["submitted_at"],
+                (repo, str(dia), str(r["id"]), login, dev_de(login), r["submitted_at"],
                  json.dumps(sorted(nums)), ruido,
                  json.dumps({"pr": n, "titulo_pr": pr["title"], "estado": r["state"], "comentarios": k},
                             ensure_ascii=False)))
