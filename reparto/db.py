@@ -65,3 +65,10 @@ def guardar_pesos(con, repo, dia, issues):
             con.execute("INSERT INTO pesos VALUES (?,?,?,?,?,?)", (repo, n, peso, int(bug), titulo, str(dia)))
             cambios += 1
     return cambios
+
+
+def pesos_vigentes(con, repo, dia):
+    """{issue: (peso, bug, título)} tal como estaban registrados al cierre de `dia`."""
+    filas = con.execute(
+        "SELECT issue, peso, bug, titulo FROM pesos WHERE repo=? AND desde<=? ORDER BY desde, rowid", (repo, str(dia)))
+    return {n: (p, bool(b), t) for n, p, b, t in filas}  # la fila más reciente gana
