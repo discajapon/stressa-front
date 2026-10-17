@@ -80,8 +80,11 @@ def imagen(dia, pct_dia, pct_total, devs):
     f = ImageFont.load_default(size=18)
     x = 580 - 85 * len(devs)
     for dev in devs:
-        d.rounded_rectangle((x, 392, x + 16, 408), radius=4, fill=color[dev])
-        d.text((x + 24, 400), dev, fill=TEXTO_2, font=f, anchor="lm")
+        if avatar(dev, 22) is None:
+            d.rounded_rectangle((x, 392, x + 16, 408), radius=4, fill=color[dev])
+        else:
+            _pegar_avatar(img, d, dev, x + 8, 400, 22, color[dev])
+        d.text((x + 26, 400), dev, fill=TEXTO_2, font=f, anchor="lm")
         x += 170
     buf = io.BytesIO()
     img.save(buf, "PNG")
