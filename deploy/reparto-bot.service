@@ -1,0 +1,16 @@
+[Unit]
+Description=Reparto Discayama: bot de Discord (/cambiar)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=reparto
+# DISCORD_BOT_TOKEN además de las credenciales del servicio; permisos 600, fuera del repo.
+EnvironmentFile=/etc/reparto/env
+ExecStart=/opt/reparto/.venv/bin/reparto-bot
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
