@@ -1,4 +1,6 @@
 import sqlite3
+from dataclasses import dataclass
+from datetime import date
 
 # Solo referencias (repo, sha, PR, archivo) y metadatos: nunca código fuente.
 ESQUEMA = """
@@ -45,6 +47,13 @@ CREATE TABLE IF NOT EXISTS juicios (
     avance REAL, calidad REAL,
     razonamiento TEXT
 );
+-- Proyectos (un repo cada uno). Se cambian con /cambiar en Discord o `reparto cambiar`.
+CREATE TABLE IF NOT EXISTS proyectos (
+    repo TEXT PRIMARY KEY,  -- "owner/nombre"
+    inicio TEXT,            -- lo anterior a este día no cuenta
+    activo INTEGER,         -- se recoge cada día; uno a la vez
+    cambiado TEXT, por TEXT -- cuándo y quién lo activó o cerró
+);
 -- Disca reemplaza los puntos de un dev en un día. Se guarda el valor original y el motivo.
 -- Vale para la evaluación indicada; si el día se reevalúa, la disputa queda en el historial.
 CREATE TABLE IF NOT EXISTS disputas (
@@ -82,3 +91,17 @@ def pesos_vigentes(con, repo, dia):
     filas = con.execute(
         "SELECT issue, peso, bug, titulo FROM pesos WHERE repo=? AND desde<=? ORDER BY desde, rowid", (repo, str(dia)))
     return {n: (p, bool(b), t) for n, p, b, t in filas}  # la fila más reciente gana
+
+
+@dataclass
+class Proyecto:
+    repo: str
+    inicio: date
+
+
+def proyectos(con, solo_activos=True):
+    """Proyectos registrados, el activo primero."""
+    filas = con.execute(
+        "SELECT repo, inicio FROM proyectos" + (" WHERE activo=1" if solo_activos else "")
+        + " ORDER BY activo DESC, inicio DESC").fetchall()
+    return [Proyecto(r, date.fromisoformat(i)) for r, i in filas]
