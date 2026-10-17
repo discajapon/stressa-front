@@ -9,9 +9,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from reparto.recolectar import atribuir, dia_cerrado, peso_de, refs_issues, ventana
 from reparto.calculo import acumulado, porcentajes, puntos_dia
-from reparto.db import abrir
+from reparto.db import abrir, proyectos
 from reparto.juez import trozos, validar
 from reparto.ruido import clasificar
+from reparto.servicio import cambiar, repo_de_url
 
 GYE = ZoneInfo("America/Guayaquil")  # UTC-5
 cfg = SimpleNamespace(zona=GYE, corte="00:00", emails={"a@pc.local": "discajapon"})
@@ -154,6 +155,33 @@ def test_porcentajes():
     assert porcentajes({"a": 1, "b": 1, "c": 1}) == {"a": 34, "b": 33, "c": 33}
     assert porcentajes({"a": 1, "b": 1}) == {"a": 50, "b": 50}
     assert porcentajes({"a": 0, "b": 0}) == {}
+
+
+def test_cambiar():
+    import requests
+
+    class GH:  # solo lee los repos de `visibles`
+        visibles = {"discayama/cliente-a": "Discayama/cliente-a", "discayama/cliente-b": "Discayama/cliente-b"}
+
+        def get(self, ruta):
+            nombre = ruta.removeprefix("/repos/").casefold()
+            if nombre not in self.visibles:
+                raise requests.HTTPError("404")
+            return {"full_name": self.visibles[nombre]}
+
+    assert repo_de_url("https://github.com/Discayama/cliente-a.git") == "Discayama/cliente-a"
+    con, gh = abrir(":memory:"), GH()
+    assert cambiar(cfg, gh, con, "https://github.com/discayama/cliente-a", "disca") == ("Discayama/cliente-a", [])
+    assert cambiar(cfg, gh, con, "github.com/Discayama/cliente-b/", "disca") == ("Discayama/cliente-b", ["Discayama/cliente-a"])
+    assert [p.repo for p in proyectos(con)] == ["Discayama/cliente-b"]  # uno activo a la vez
+    assert len(proyectos(con, solo_activos=False)) == 2  # el cerrado se conserva
+    for malo in ("https://gitlab.com/a/b", "https://github.com/Discayama/privado-ajeno",
+                 "https://github.com/Discayama/cliente-b"):  # ajena, sin acceso, ya activa
+        try:
+            cambiar(cfg, gh, con, malo, "disca")
+        except ValueError:
+            continue
+        raise AssertionError(f"debió rechazar {malo}")
 
 
 if __name__ == "__main__":
