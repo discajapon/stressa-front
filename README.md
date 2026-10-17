@@ -4,33 +4,72 @@ Reparto diario del pago de cada proyecto según la contribución real de cada de
 evaluada por un LLM que lee el código. El % resultante es el pago, así que todo
 queda registrado y se puede consultar.
 
-**Estado:** recolección, atribución y juez. El cálculo de puntos y %, Discord,
-la cola por caída del supercomputador y las disputas vienen en los siguientes PRs.
+Cada día, después del corte, publica en Discord (#reparto) una torta con el % de
+cada dev en el día y en todo el proyecto. **Solo salen porcentajes**: los puntos son
+la balanza interna y se consultan con `reparto ver`.
 
 ## Instalación (VPS)
 
 ```sh
-python3 -m venv .venv && .venv/bin/pip install -e .
-sudo mkdir -p /etc/reparto /var/lib/reparto
-sudo cp config.example.toml /etc/reparto/config.toml   # y editarlo
+sudo useradd --system --home /opt/reparto reparto
+sudo git clone https://github.com/discajapon/commit-analizer.git /opt/reparto
+sudo python3 -m venv /opt/reparto/.venv && sudo /opt/reparto/.venv/bin/pip install -e /opt/reparto
+sudo mkdir -p /etc/reparto /var/lib/reparto && sudo chown reparto /var/lib/reparto
+sudo cp /opt/reparto/config.example.toml /etc/reparto/config.toml   # y editarlo
+sudo install -m 600 -o reparto /dev/null /etc/reparto/env           # y poner las credenciales
+sudo cp /opt/reparto/deploy/reparto.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now reparto.timer
 ```
 
-Credenciales solo por entorno, nunca en el repo:
+Credenciales solo por entorno (`/etc/reparto/env`, permisos 600), nunca en el repo:
 
 - `GITHUB_TOKEN`: token *fine-grained* de solo lectura sobre los repos del proyecto
   (Contents, Issues, Pull requests, Metadata).
 - `LLM_CLAVE`: clave del servidor del juez (supercomputador).
+- `DISCORD_WEBHOOK`: webhook del canal #reparto.
 - `REPARTO_CONFIG` (opcional): ruta de la config si no es `/etc/reparto/config.toml`.
 
 ## Uso
 
+El timer corre `reparto tick` cada 10 minutos: recoge los días cerrados, evalúa en
+orden los pendientes y publica. Para usar la CLI a mano en el VPS:
+`sudo -u reparto bash -c 'set -a; . /etc/reparto/env; /opt/reparto/.venv/bin/reparto ver 2026-10-16'`.
+
 ```sh
+reparto tick                        # una vuelta del servicio (lo que hace el timer)
 reparto recolectar                  # último día cerrado según el corte
 reparto recolectar --dia 2026-10-16 # un día concreto (repetirlo no duplica)
 reparto evaluar --dia 2026-10-16    # el juez evalúa el día (sin cambios, no repite)
 reparto evaluar --dia 2026-10-16 --forzar  # nueva versión; la anterior se conserva
-reparto ver 2026-10-16              # qué aportó cada dev, qué se descartó y por qué
+reparto ver 2026-10-16              # qué aportó cada dev, puntos, %, por qué y disputas
+reparto disputa 2026-10-16 nyroxt 4.5 "el bug era más difícil de lo que vio el juez"
+reparto reevaluar 2026-10-16        # tras corregir un peso: nueva versión, anunciada
 ```
+
+## Reparto
+
+- Puntos de cada aporte = peso del Issue × avance × calidad (los da el juez; ver abajo).
+- **% del día** = puntos del dev en el día / puntos de todos ese día. Sin puntos, no hay torta.
+- **% del proyecto** = puntos del dev en todos los días / puntos de todos en el proyecto.
+  Con ese % se reparte el pago del proyecto cuando el cliente paga; la herramienta no mueve dinero.
+- Los % se redondean a enteros que suman exactamente 100.
+- Un Issue no se construye más del 100%: si entre todos los días se pasa, el avance
+  de `codigo` del día que lo excede se escala.
+
+## Caída del supercomputador
+
+Si el juez no responde al corte, el día queda en cola, se avisa **una vez** en
+Discord y se evalúa solo en cuanto vuelva, en orden y con el mismo juez. Los días
+siguientes esperan detrás para que el acumulado salga siempre en orden.
+
+## Disputas y reevaluaciones
+
+- `reparto disputa` reemplaza los puntos de un dev en un día. Se guarda el valor
+  original, el nuevo y el motivo, cambia el acumulado y se anuncia en Discord (en %).
+- `reparto reevaluar` crea una versión nueva del día con los pesos actuales y la anuncia.
+  Las versiones anteriores se conservan (`reparto ver` las lista). Las disputas de una
+  versión anterior no se trasladan a la nueva.
+- Evaluar dos veces un día sin cambios no llama al juez ni duplica nada.
 
 ## Qué se recoge
 
