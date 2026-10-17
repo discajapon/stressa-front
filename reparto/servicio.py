@@ -176,3 +176,12 @@ def cambiar(cfg, gh, con, url, por):
     con.execute("INSERT OR REPLACE INTO proyectos VALUES (?, ?, 1, ?, ?)", (repo, str(hoy), _ahora(), por))
     con.commit()
     return repo, cerrados
+
+
+def anunciar_cambio(cfg, con, repo, cerrados, por):
+    """Anuncia en Discord el proyecto nuevo y el reparto final de los que se cerraron."""
+    lineas = [f"📦 **Proyecto activo: {repo}** desde hoy, {datetime.now(cfg.zona):%d/%m/%Y} (cambiado por {por})."]
+    for viejo in cerrados:
+        final = porcentajes(acumulado(con, viejo, date.max))
+        lineas.append(f"Se cerró {viejo}. Reparto final del proyecto: {texto_pct(final) or 'sin puntos'}")
+    enviar(cfg, "\n".join(lineas))
