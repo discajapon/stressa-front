@@ -99,3 +99,27 @@ def tick(cfg, gh, con, ahora=None):
                     break
                 _estado(con, p.repo, dia, "evaluado")
             publicar(cfg, con, p.repo, dia)
+
+
+def disputa(cfg, con, repo, dia, dev, nuevo, motivo):
+    """Disca reemplaza los puntos de `dev` en `dia`. Guarda original, nuevo y motivo, y lo anuncia."""
+    ev = _vigente(con, repo, dia)
+    if ev is None:
+        raise SystemExit(f"El {dia} no tiene evaluación en {repo}")
+    pts = puntos_dia(con, ev)
+    if dev not in pts:
+        raise SystemExit(f"{dev} no tiene aportes evaluados el {dia}")
+    if not motivo.strip():
+        raise SystemExit("La disputa necesita un motivo")
+    antes_dia, antes_total = porcentajes(pts), porcentajes(acumulado(con, repo, date.max))
+    con.execute("INSERT INTO disputas (evaluacion, dev, original, nuevo, motivo, creada) VALUES (?, ?, ?, ?, ?, ?)",
+                (ev, dev, pts[dev], nuevo, motivo, _ahora()))
+    con.commit()
+    despues_dia, despues_total = porcentajes(puntos_dia(con, ev)), porcentajes(acumulado(con, repo, date.max))
+    enviar(cfg, "\n".join([
+        f"⚖️ **Disputa del {dia:%d/%m/%Y}** · {repo}: se corrigió la evaluación de {dev}.",
+        f"Motivo: {motivo}",
+        f"Día: {texto_pct(antes_dia)}  →  {texto_pct(despues_dia)}",
+        f"Proyecto: {texto_pct(antes_total)}  →  {texto_pct(despues_total)}",
+    ]))
+    return pts[dev]
