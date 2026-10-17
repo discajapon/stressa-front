@@ -8,8 +8,11 @@ class Caido(Exception):
     """El supercomputador no respondió; el día queda pendiente y se reintenta luego."""
 
 
-def completar(cfg, sistema, usuario, esquema):
-    """Respuesta JSON del juez, forzada por `esquema` (json_schema estricto)."""
+def completar(cfg, sistema, usuario, esquema, max_tokens):
+    """Respuesta JSON del juez, forzada por `esquema` (json_schema estricto).
+
+    `max_tokens` acota razonamiento + respuesta: sin tope, un modelo que razona puede no terminar.
+    """
     if not cfg.llm_clave:
         raise SystemExit("Falta LLM_CLAVE en el entorno")
     try:
@@ -19,6 +22,7 @@ def completar(cfg, sistema, usuario, esquema):
             json={
                 "model": cfg.llm_modelo,
                 "temperature": 0,
+                "max_tokens": max_tokens,
                 "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": usuario}],
                 "response_format": {"type": "json_schema",
                                     "json_schema": {"name": "evaluacion", "strict": True, "schema": esquema}},
@@ -30,4 +34,7 @@ def completar(cfg, sistema, usuario, esquema):
     if r.status_code == 429 or r.status_code >= 500:
         raise Caido(f"HTTP {r.status_code}: {r.text[:200]}")
     r.raise_for_status()
-    return json.loads(r.json()["choices"][0]["message"]["content"])
+    eleccion = r.json()["choices"][0]
+    if eleccion.get("finish_reason") == "length":
+        raise ValueError(f"respuesta cortada al llegar a {max_tokens} tokens; sé más breve al razonar")
+    return json.loads(eleccion["message"]["content"])
