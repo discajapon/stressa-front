@@ -42,13 +42,21 @@ def crear(cfg):
             return
         await interaccion.followup.send(f"✅ Proyecto activo: {nuevo}. Lo anuncié en el canal.", ephemeral=True)
 
+    async def registrar(servidor):
+        # Registro por servidor: el comando aparece al instante (el global tarda hasta una hora).
+        arbol.copy_global_to(guild=servidor)
+        await arbol.sync(guild=servidor)
+
     @cliente.event
     async def on_ready():
-        # Registro por servidor: el comando aparece al instante (el global tarda hasta una hora).
         for servidor in cliente.guilds:
-            arbol.copy_global_to(guild=servidor)
-            await arbol.sync(guild=servidor)
+            await registrar(servidor)
         print(f"Bot listo como {cliente.user}; /cambiar en {len(cliente.guilds)} servidor(es)", flush=True)
+
+    @cliente.event
+    async def on_guild_join(servidor):
+        await registrar(servidor)
+        print(f"/cambiar registrado en {servidor.name}", flush=True)
 
     return cliente
 
