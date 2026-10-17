@@ -38,6 +38,6 @@ Cada entrada tiene:
 
 ## Es ruido (avance 0)
 
-Merges; código duplicado o solo movido de sitio; código generado; dependencias de terceros; lockfiles; binarios; cambios solo de formato, nombres o comentarios sin efecto; contenido de relleno. Lo más evidente ya se filtró antes de llegar a ti, pero si ves más, márcalo como `ruido`.
+Merges; código duplicado o solo movido de sitio; archivos que produce una herramienta automáticamente (compilados, clientes o migraciones autogenerados; no el código escrito con ayuda de IA, que vale como cualquier otro); dependencias de terceros; lockfiles; binarios; cambios solo de formato, nombres o comentarios sin efecto; contenido de relleno. Lo más evidente ya se filtró antes de llegar a ti, pero si ves más, márcalo como `ruido`.
 
 Responde solo con el JSON pedido.
