@@ -5,7 +5,7 @@ from .calculo import acumulado, porcentajes, puntos_dia, puntos_juicios
 from .discord import enviar, imagen
 from .juez import evaluar_dia
 from .llm import Caido
-from .db import guardar_pesos
+from .db import guardar_pesos, proyectos
 from .recolectar import dia_cerrado, issues, recolectar
 
 
@@ -66,9 +66,12 @@ def publicar(cfg, con, repo, dia, encabezado=None):
 
 
 def recolectar_pendientes(cfg, gh, con, proyecto, ahora):
-    """Recoge, en orden, cada día cerrado que aún no se recogió (desde el inicio del proyecto)."""
+    """Recoge, en orden, cada día cerrado que aún no se recogió desde el inicio del proyecto.
+
+    Si el proyecto se reactiva, empieza en su nuevo inicio: no rellena el tiempo en que estuvo cerrado.
+    """
     ultimo = con.execute("SELECT max(dia) FROM dias WHERE repo=?", (proyecto.repo,)).fetchone()[0]
-    dia = date.fromisoformat(ultimo) + timedelta(days=1) if ultimo else proyecto.inicio
+    dia = max(date.fromisoformat(ultimo) + timedelta(days=1), proyecto.inicio) if ultimo else proyecto.inicio
     while dia <= dia_cerrado(ahora, cfg):
         recolectar(cfg, gh, con, proyecto, dia)
         dia += timedelta(days=1)
@@ -82,8 +85,10 @@ def tick(cfg, gh, con, ahora=None):
     evalúan cuando vuelva, con el mismo juez.
     """
     ahora = ahora or datetime.now(timezone.utc)
-    for p in cfg.proyectos:
+    for p in proyectos(con):
         recolectar_pendientes(cfg, gh, con, p, ahora)
+    # La cola incluye proyectos ya cerrados: un día pendiente se termina de evaluar y publicar igual.
+    for p in proyectos(con, solo_activos=False):
         cola = con.execute(
             "SELECT dia, estado FROM dias WHERE repo=? AND estado IN ('recolectado', 'pendiente_juez', 'evaluado')"
             " ORDER BY dia", (p.repo,)).fetchall()
