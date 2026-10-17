@@ -1,12 +1,20 @@
 """El juez: arma el contexto de cada aporte, lo manda al LLM y valida lo que vuelve."""
+import hashlib
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
+
+from .db import pesos_vigentes
+from .llm import completar
 
 PROMPT = Path(__file__).parent / "prompts" / "juez_v1.md"
 VERSION = "juez_v1"
 CATEGORIAS = ["codigo", "bug", "tests", "simplificacion", "review", "ruido"]
 TOPE_REVIEW = 0.3
+RESERVA_SALIDA = 24_000  # tokens para el razonamiento y la respuesta del modelo
+# ponytail: estimación fija de tokens; si el servidor rechaza por contexto, bajar este número.
+CHARS_POR_TOKEN = 2.5
 MAX_ARCHIVO = 80_000  # caracteres; un archivo completo más grande se manda solo como diff
 
 ESQUEMA = {
@@ -54,7 +62,7 @@ def validar(salida, refs, issues):
         if e["categoria"] == "ruido":
             avance, peso = 0.0, None
         elif issue is None and not (isinstance(peso, (int, float)) and peso > 0):
-            raise ValueError(f"{e['ref']} sin Issue y sin peso estimado")
+            raise ValueError(f"{e['ref']}: sin Issue con peso asignado; pon issue null y estima peso_estimado")
         if e["categoria"] == "review":
             avance = min(avance, TOPE_REVIEW)
         limpias.append({**e, "issue": issue, "peso_estimado": None if issue else peso,
@@ -157,3 +165,73 @@ def contexto_review(gh, repo, fila, pesos, cache):
     archivos = [(f"### Comentario en {c['path']}\n```diff\n{c['diff_hunk']}\n```\n{c['body']}\n", None)
                 for c in gh.paginar(f"/repos/{repo}/pulls/{n}/reviews/{rid}/comments")]
     return ref, cab, archivos
+
+
+def _sha(texto):
+    return hashlib.sha256(texto.encode()).hexdigest()
+
+
+def _juzgar(cfg, sistema, usuario, refs, issues):
+    """Llama al juez; si la salida no es válida, reintenta diciéndole qué falló."""
+    error = None
+    for _ in range(3):
+        aviso = f"\n\nTu respuesta anterior no era válida: {error}. Corrígela." if error else ""
+        try:
+            return validar(completar(cfg, sistema, usuario + aviso, ESQUEMA), refs, issues)
+        except (ValueError, KeyError, TypeError) as e:
+            error = str(e)
+    raise RuntimeError(f"el juez devolvió una salida inválida 3 veces: {error}")
+
+
+def evaluar_dia(cfg, gh, con, repo, dia, forzar=False):
+    """Evalúa los aportes útiles del día y guarda una evaluación nueva como vigente.
+
+    Si las entradas no cambiaron desde la evaluación vigente, la devuelve sin llamar al
+    juez (salvo `forzar`). Devuelve el id de la evaluación, o None si no hubo actividad.
+    """
+    cols = ("dev", "tipo", "ref", "issues", "detalle")
+    filas = [dict(zip(cols, f)) for f in con.execute(
+        "SELECT dev, tipo, ref, issues, detalle FROM aportes"
+        " WHERE repo=? AND dia=? AND ruido IS NULL AND dev IS NOT NULL ORDER BY dev, fecha, ref",
+        (repo, str(dia)))]
+    if not filas:
+        return None
+    pesos = pesos_vigentes(con, repo, dia)
+    sistema = PROMPT.read_text()
+    prompt = f"{VERSION}:{_sha(sistema)[:12]}"
+    h = _sha(json.dumps([prompt, cfg.llm_modelo, [[f[k] for k in cols[:4]] for f in filas], sorted(pesos.items())]))
+    vigente = con.execute(
+        "SELECT id, hash FROM evaluaciones WHERE repo=? AND dia=? AND vigente=1", (repo, str(dia))).fetchone()
+    if vigente and vigente[1] == h and not forzar:
+        return vigente[0]
+
+    con_peso = {n for n, (p, _, _) in pesos.items() if p is not None}
+    escala = "# Issues del proyecto (escala de pesos)\n" + (
+        "".join(f"- #{n} [peso {pesos[n][0]}] {pesos[n][2]}\n" for n in sorted(con_peso)) or "(ninguno con peso)\n")
+    limite = int((cfg.llm_contexto - RESERVA_SALIDA) * CHARS_POR_TOKEN) - len(sistema) - len(escala)
+    juicios, cache = [], {}
+    for dev in sorted({f["dev"] for f in filas}):
+        bloques, origen = [], {}
+        for f in filas:
+            if f["dev"] == dev:
+                b = (contexto_commit if f["tipo"] == "commit" else contexto_review)(gh, repo, f, pesos, cache)
+                bloques.append(b)
+                origen[b[0]] = (f["tipo"], f["ref"])
+        for texto, refs in trozos(bloques, limite):
+            for e in _juzgar(cfg, sistema, f"{escala}\n# Aportes del día\n{texto}", refs, con_peso):
+                tipo, ref = origen[e["ref"]]
+                peso = pesos[e["issue"]][0] if e["issue"] else e["peso_estimado"]
+                juicios.append((dev, ref, tipo, e["categoria"], e["issue"], peso,
+                                e["avance"], e["calidad"], e["razonamiento"]))
+
+    version = (con.execute("SELECT max(version) FROM evaluaciones WHERE repo=? AND dia=?",
+                           (repo, str(dia))).fetchone()[0] or 0) + 1
+    con.execute("UPDATE evaluaciones SET vigente=0 WHERE repo=? AND dia=?", (repo, str(dia)))
+    cur = con.execute(
+        "INSERT INTO evaluaciones (repo, dia, version, hash, prompt, modelo, creada, vigente)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+        (repo, str(dia), version, h, prompt, cfg.llm_modelo, datetime.now(timezone.utc).isoformat()))
+    con.executemany("INSERT INTO juicios VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [(cur.lastrowid, *j) for j in juicios])
+    con.commit()
+    return cur.lastrowid
