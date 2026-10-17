@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from reparto.recolectar import dia_cerrado, ventana
+from reparto.recolectar import atribuir, dia_cerrado, refs_issues, ventana
 from reparto.ruido import clasificar
 
 GYE = ZoneInfo("America/Guayaquil")  # UTC-5
@@ -55,6 +55,20 @@ def test_clasificar():
         "package-lock.json": "lockfile", "logo.png": "binario", "viejo.py": "renombrado",
         "fmt.py": "formato", "a.py": "movido", "b.py": "movido", "c.py": None, "d.py": None,
     }, m
+
+
+def test_atribuir():
+    con_cuenta = {"author": {"login": "disca_japon"}, "commit": {"author": {"email": "x@y"}}}
+    sin_cuenta = {"author": None, "commit": {"author": {"email": "A@PC.local"}}}
+    ajeno = {"author": {"login": "otro"}, "commit": {"author": {"email": "o@y"}}}
+    assert atribuir(con_cuenta, cfg) == ("disca_japon", "Disca")
+    assert atribuir(sin_cuenta, cfg) == ("disca_japon", "Disca")
+    assert atribuir(ajeno, cfg) == ("otro", None)
+
+
+def test_refs_issues():
+    assert refs_issues(["Arregla login (#12)", "closes #3, ver a/b#9"], ["feat/7-pago", "main", "v2"]) == {12, 3, 7}
+    assert refs_issues(["sin issue"], ["issue-40"]) == {40}
 
 
 if __name__ == "__main__":
