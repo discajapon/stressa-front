@@ -1,0 +1,16 @@
+[project]
+name = "reparto"
+version = "0.1.0"
+description = "Reparto Discayama: reparto diario por contribución real, evaluada por un LLM"
+requires-python = ">=3.12"
+dependencies = ["requests"]
+
+[project.scripts]
+reparto = "reparto.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["reparto"]
