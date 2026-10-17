@@ -3,6 +3,7 @@ import json
 from datetime import date, datetime, timezone
 
 from . import config, db
+from .calculo import porcentajes, puntos_dia, puntos_juicios
 from .github import GitHub
 from .juez import evaluar_dia
 from .recolectar import dia_cerrado, recolectar
@@ -41,17 +42,30 @@ def ver(con, repo, dia):
     if not ev:
         return
     print(f"\n  Evaluación v{ev[1]} · {ev[2]} · {ev[3]} · {ev[4][:16]}")
+    otras = con.execute("SELECT version, creada FROM evaluaciones WHERE repo=? AND dia=? AND vigente=0 ORDER BY version",
+                        (repo, str(dia))).fetchall()
+    if otras:
+        print("  Versiones anteriores: " + ", ".join(f"v{v} ({c[:10]})" for v, c in otras))
+    totales = puntos_dia(con, ev[0])
+    pct = porcentajes(totales)
+    puntos = [p for _, p, _ in puntos_juicios(con, ev[0])]
     actual = None
-    for dev, ref, tipo, cat, issue, peso, avance, calidad, razon in con.execute(
-            "SELECT dev, ref, tipo, categoria, issue, peso, avance, calidad, razonamiento FROM juicios"
-            " WHERE evaluacion=? ORDER BY dev, rowid", (ev[0],)):
+    filas = con.execute(
+        "SELECT dev, ref, tipo, categoria, issue, peso, avance, calidad, razonamiento FROM juicios"
+        " WHERE evaluacion=? ORDER BY rowid", (ev[0],)).fetchall()
+    for (dev, ref, tipo, cat, issue, peso, avance, calidad, razon), pts in sorted(
+            zip(filas, puntos), key=lambda fp: fp[0][0]):
         if dev != actual:
-            print(f"  {dev}")
+            print(f"  {dev}: {totales.get(dev, 0):.2f} puntos · {pct.get(dev, 0)}% del día")
             actual = dev
         donde = f"#{issue}" if issue else "SIN ISSUE"
         peso = "-" if peso is None else f"{peso:g}"
-        print(f"    {tipo} {ref[:10]} {cat}: {donde} peso {peso} · avance {avance:.2f} · calidad {calidad:.2f}")
+        print(f"    {tipo} {ref[:10]} {cat}: {donde} peso {peso} · avance {avance:.2f} · calidad {calidad:.2f}"
+              f" → {pts:.2f}")
         print(f"      {razon}")
+    for dev, original, nuevo, motivo, creada in con.execute(
+            "SELECT dev, original, nuevo, motivo, creada FROM disputas WHERE evaluacion=? ORDER BY id", (ev[0],)):
+        print(f"  Disputa {creada[:16]}: {dev} {original:.2f} → {nuevo:.2f} puntos. Motivo: {motivo}")
 
 
 def main():
