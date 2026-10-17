@@ -29,6 +29,16 @@ def avatar(login, lado):
     return foto
 
 
+def _pegar_avatar(img, d, login, cx, cy, lado, color):
+    """Foto centrada en (cx, cy) con un aro del color del dev; si no hay foto, no dibuja nada."""
+    foto = avatar(login, lado)
+    if foto is None:
+        return
+    x, y = round(cx - lado / 2), round(cy - lado / 2)
+    d.ellipse((x - 3, y - 3, x + lado + 2, y + lado + 2), fill=color)
+    img.paste(foto, (x, y), foto)
+
+
 def _torta(d, cx, cy, titulo, pct, color):
     f = ImageFont.load_default(size=20)
     d.text((cx, 28), titulo, fill=TEXTO, font=ImageFont.load_default(size=24), anchor="ma")
