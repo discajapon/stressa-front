@@ -1,10 +1,13 @@
 """El juez: arma el contexto de cada aporte, lo manda al LLM y valida lo que vuelve."""
+import json
 from pathlib import Path
+from urllib.parse import quote
 
 PROMPT = Path(__file__).parent / "prompts" / "juez_v1.md"
 VERSION = "juez_v1"
 CATEGORIAS = ["codigo", "bug", "tests", "simplificacion", "review", "ruido"]
 TOPE_REVIEW = 0.3
+MAX_ARCHIVO = 80_000  # caracteres; un archivo completo más grande se manda solo como diff
 
 ESQUEMA = {
     "type": "object",
@@ -106,3 +109,51 @@ def trozos(aportes, limite):
     if texto:
         salida.append((texto, refs))
     return salida
+
+
+def _issue(gh, repo, n, pesos, cache):
+    if n not in cache:
+        i = gh.get(f"/repos/{repo}/issues/{n}")
+        peso, bug, titulo = pesos.get(n, (None, False, i["title"]))
+        cache[n] = (f"- #{n} [peso {peso if peso is not None else 'sin asignar'}{', bug' if bug else ''}] "
+                    f"{titulo}\n{(i['body'] or '').strip()[:4000]}\n")
+    return cache[n]
+
+
+def contexto_commit(gh, repo, fila, pesos, cache):
+    """(ref, cabecera, [(diff de archivo, archivo completo)]) leídos de GitHub; no se guardan."""
+    sha, issues, detalle = fila["ref"], json.loads(fila["issues"]), json.loads(fila["detalle"])
+    ruido = {a["ruta"] for a in detalle["archivos"] if a["ruido"]}
+    c = gh.get(f"/repos/{repo}/commits/{sha}")
+    ref = f"c:{sha[:10]}"
+    cab = (f"\n## Aporte {ref} (commit)\nMensaje:\n{c['commit']['message'].strip()[:2000]}\n"
+           f"Issues vinculados:\n" + ("".join(_issue(gh, repo, n, pesos, cache) for n in issues) or "ninguno\n"))
+    archivos = []
+    for a in c.get("files", []):
+        if a["filename"] in ruido:
+            continue
+        txt = f"### {a['filename']} ({a['status']}, +{a['additions']} -{a['deletions']})\n```diff\n{a.get('patch', '')}\n```\n"
+        completo = None
+        if a["status"] != "removed" and a["changes"] and a.get("patch") is not None:
+            completo = gh.texto(f"/repos/{repo}/contents/{quote(a['filename'])}", "raw", ref=sha)
+            if completo and len(completo) > MAX_ARCHIVO:
+                completo = None
+        archivos.append((txt, completo))
+    return ref, cab, archivos
+
+
+def contexto_review(gh, repo, fila, pesos, cache):
+    """(ref, cabecera, [(comentario con su fragmento de código, None)])."""
+    rid, detalle = fila["ref"], json.loads(fila["detalle"])
+    n = detalle["pr"]
+    pr = gh.get(f"/repos/{repo}/pulls/{n}")
+    r = gh.get(f"/repos/{repo}/pulls/{n}/reviews/{rid}")
+    ref = f"r:{rid}"
+    cab = (f"\n## Aporte {ref} (review del PR #{n}: {pr['title']})\n"
+           f"Descripción del PR:\n{(pr['body'] or '').strip()[:3000]}\n"
+           f"Issues vinculados:\n" + ("".join(_issue(gh, repo, i, pesos, cache) for i in json.loads(fila["issues"]))
+                                      or "ninguno\n")
+           + f"Estado de la review: {r['state']}\nComentario general:\n{(r['body'] or '').strip() or '(vacío)'}\n")
+    archivos = [(f"### Comentario en {c['path']}\n```diff\n{c['diff_hunk']}\n```\n{c['body']}\n", None)
+                for c in gh.paginar(f"/repos/{repo}/pulls/{n}/reviews/{rid}/comments")]
+    return ref, cab, archivos
