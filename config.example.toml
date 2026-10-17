@@ -11,9 +11,7 @@ url = "https://ai.hpc.cedia.edu.ec/v1"
 modelo = "cedia-qwen-large-thinking"
 contexto = 131072   # tokens; medido en el servidor
 
-[[proyecto]]
-repo = "Discayama/cliente-x"
-inicio = "2026-10-01"   # nada anterior a esta fecha cuenta para el proyecto
+# El proyecto (repo) activo no va aquí: se cambia con /cambiar en Discord o `reparto cambiar <url>`.
 
 # Cada dev aparece con su cuenta de GitHub, tomada del autor de cada commit.
 # Emails de commit que GitHub no vincula a ninguna cuenta = cuenta de GitHub.
