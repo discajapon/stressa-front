@@ -3,6 +3,8 @@ from datetime import date, datetime, timedelta, timezone
 
 from .calculo import acumulado, porcentajes, puntos_dia, puntos_juicios
 from .discord import enviar, imagen
+from .juez import evaluar_dia
+from .llm import Caido
 from .recolectar import dia_cerrado, recolectar
 
 
@@ -69,3 +71,31 @@ def recolectar_pendientes(cfg, gh, con, proyecto, ahora):
     while dia <= dia_cerrado(ahora, cfg):
         recolectar(cfg, gh, con, proyecto, dia)
         dia += timedelta(days=1)
+
+
+def tick(cfg, gh, con, ahora=None):
+    """Una vuelta del servicio (cada pocos minutos por el timer de systemd).
+
+    Recoge los días cerrados y evalúa y publica los pendientes en orden. Si el supercomputador
+    no responde, avisa una sola vez en Discord y deja ese día y los siguientes en cola: se
+    evalúan cuando vuelva, con el mismo juez.
+    """
+    ahora = ahora or datetime.now(timezone.utc)
+    for p in cfg.proyectos:
+        recolectar_pendientes(cfg, gh, con, p, ahora)
+        cola = con.execute(
+            "SELECT dia, estado FROM dias WHERE repo=? AND estado IN ('recolectado', 'pendiente_juez', 'evaluado')"
+            " ORDER BY dia", (p.repo,)).fetchall()
+        for dia, estado in cola:
+            dia = date.fromisoformat(dia)
+            if estado != "evaluado":
+                try:
+                    evaluar_dia(cfg, gh, con, p.repo, dia)
+                except Caido:
+                    if estado != "pendiente_juez":
+                        enviar(cfg, f"⏳ El reparto del {dia:%d/%m/%Y} ({p.repo}) está pendiente: el supercomputador "
+                                    "no responde. Se evaluará en cuanto vuelva, con el mismo juez.")
+                        _estado(con, p.repo, dia, "pendiente_juez")
+                    break
+                _estado(con, p.repo, dia, "evaluado")
+            publicar(cfg, con, p.repo, dia)
