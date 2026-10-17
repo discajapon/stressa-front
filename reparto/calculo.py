@@ -34,3 +34,25 @@ def puntos_dia(con, evaluacion):
     for dev, nuevo in con.execute("SELECT dev, nuevo FROM disputas WHERE evaluacion=? ORDER BY id", (evaluacion,)):
         pts[dev] = nuevo
     return dict(pts)
+
+
+def porcentajes(pts):
+    """% enteros que suman exactamente 100 (método del resto mayor); {} si nadie tiene puntos."""
+    total = sum(pts.values())
+    if total <= 0:
+        return {}
+    exactos = {d: 100 * p / total for d, p in pts.items()}
+    pct = {d: int(x) for d, x in exactos.items()}
+    for d in sorted(exactos, key=lambda d: (pct[d] - exactos[d], d))[:100 - sum(pct.values())]:
+        pct[d] += 1
+    return pct
+
+
+def acumulado(con, repo, hasta):
+    """{dev: puntos} de todo el proyecto hasta `hasta` inclusive (evaluaciones vigentes)."""
+    total = defaultdict(float)
+    for (ev,) in con.execute(
+            "SELECT id FROM evaluaciones WHERE repo=? AND dia<=? AND vigente=1", (repo, str(hasta))).fetchall():
+        for d, p in puntos_dia(con, ev).items():
+            total[d] += p
+    return dict(total)
