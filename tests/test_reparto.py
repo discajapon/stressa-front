@@ -12,7 +12,7 @@ from reparto.juez import trozos, validar
 from reparto.ruido import clasificar
 
 GYE = ZoneInfo("America/Guayaquil")  # UTC-5
-cfg = SimpleNamespace(zona=GYE, corte="00:00", devs={"discajapon": "Disca"}, emails={"a@pc.local": "discajapon"})
+cfg = SimpleNamespace(zona=GYE, corte="00:00", emails={"a@pc.local": "discajapon"})
 
 
 def test_ventana():
@@ -61,10 +61,14 @@ def test_clasificar():
 def test_atribuir():
     con_cuenta = {"author": {"login": "discajapon"}, "commit": {"author": {"email": "x@y"}}}
     sin_cuenta = {"author": None, "commit": {"author": {"email": "A@PC.local"}}}
-    ajeno = {"author": {"login": "otro"}, "commit": {"author": {"email": "o@y"}}}
-    assert atribuir(con_cuenta, cfg) == ("discajapon", "Disca")
-    assert atribuir(sin_cuenta, cfg) == ("discajapon", "Disca")
-    assert atribuir(ajeno, cfg) == ("otro", None)
+    otro = {"author": {"login": "nyroxt"}, "commit": {"author": {"email": "o@y"}}}
+    bot = {"author": {"login": "dependabot[bot]"}, "commit": {"author": {"email": "b@y"}}}
+    desconocido = {"author": None, "commit": {"author": {"email": "nadie@pc"}}}
+    assert atribuir(con_cuenta, cfg) == ("discajapon", "discajapon")
+    assert atribuir(sin_cuenta, cfg) == ("discajapon", "discajapon")
+    assert atribuir(otro, cfg) == ("nyroxt", "nyroxt")
+    assert atribuir(bot, cfg) == ("dependabot[bot]", None)
+    assert atribuir(desconocido, cfg) == (None, None)
 
 
 def test_refs_issues():
