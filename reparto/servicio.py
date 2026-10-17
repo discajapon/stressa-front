@@ -5,7 +5,8 @@ from .calculo import acumulado, porcentajes, puntos_dia, puntos_juicios
 from .discord import enviar, imagen
 from .juez import evaluar_dia
 from .llm import Caido
-from .recolectar import dia_cerrado, recolectar
+from .db import guardar_pesos
+from .recolectar import dia_cerrado, issues, recolectar
 
 
 def _ahora():
@@ -123,3 +124,19 @@ def disputa(cfg, con, repo, dia, dev, nuevo, motivo):
         f"Proyecto: {texto_pct(antes_total)}  →  {texto_pct(despues_total)}",
     ]))
     return pts[dev]
+
+
+def reevaluar(cfg, gh, con, repo, dia):
+    """Nueva versión de la evaluación de `dia` con los pesos de hoy; la anterior queda en el historial.
+
+    Las disputas de la versión anterior no se trasladan: se ven en el historial y, si siguen
+    haciendo falta, se repiten sobre la nueva versión.
+    """
+    hoy = datetime.now(cfg.zona).date()
+    guardar_pesos(con, repo, hoy, issues(gh, repo))
+    ev = evaluar_dia(cfg, gh, con, repo, dia, forzar=True, pesos_al=hoy)
+    if ev is None:
+        raise SystemExit(f"El {dia} no tiene aportes útiles en {repo}")
+    version = con.execute("SELECT version FROM evaluaciones WHERE id=?", (ev,)).fetchone()[0]
+    publicar(cfg, con, repo, dia, encabezado=(
+        f"🔁 **Reevaluación del {dia:%d/%m/%Y}** · {repo} (versión {version}; las anteriores quedan en el historial)"))
