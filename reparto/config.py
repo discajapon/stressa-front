@@ -17,7 +17,6 @@ class Config:
     zona: ZoneInfo
     corte: str  # "HH:MM" hora local
     proyectos: list[Proyecto]
-    devs: dict[str, str]  # cuenta de GitHub -> nombre
     emails: dict[str, str]  # email de commit (minúsculas) -> cuenta de GitHub
     github_token: str
     llm_url: str
@@ -38,7 +37,6 @@ def cargar(ruta=None):
         zona=ZoneInfo(c.get("zona", "America/Guayaquil")),
         corte=c.get("corte", "00:00"),
         proyectos=[Proyecto(p["repo"], date.fromisoformat(str(p["inicio"]))) for p in c["proyecto"]],
-        devs=c.get("devs", {}),
         emails={k.casefold(): v for k, v in c.get("emails", {}).items()},
         github_token=token,
         llm_url=c["llm"]["url"].rstrip("/"),
