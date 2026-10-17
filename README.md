@@ -5,7 +5,9 @@ evaluada por un LLM que lee el código. El % resultante es el pago, así que tod
 queda registrado y se puede consultar.
 
 Cada día, después del corte, publica en Discord (#reparto) una torta con el % de
-cada dev en el día y en todo el proyecto, con la foto de perfil de GitHub de cada uno. **Solo salen porcentajes**: los puntos son
+cada dev en el día y en todo el proyecto, con la foto de perfil de GitHub de cada uno
+rellenando su porción. Imagen y mensajes siguen el design system de Discayama (tema
+Obsidiana, oro, Familjen Grotesk y Public Sans; fuentes OFL en `reparto/fuentes/`). **Solo salen porcentajes**: los puntos son
 la balanza interna y se consultan con `reparto ver`.
 
 ## Instalación (VPS)
