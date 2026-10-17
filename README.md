@@ -5,7 +5,7 @@ evaluada por un LLM que lee el código. El % resultante es el pago, así que tod
 queda registrado y se puede consultar.
 
 Cada día, después del corte, publica en Discord (#reparto) una torta con el % de
-cada dev en el día y en todo el proyecto. **Solo salen porcentajes**: los puntos son
+cada dev en el día y en todo el proyecto, con la foto de perfil de GitHub de cada uno. **Solo salen porcentajes**: los puntos son
 la balanza interna y se consultan con `reparto ver`.
 
 ## Instalación (VPS)
@@ -45,6 +45,23 @@ reparto ver 2026-10-16              # qué aportó cada dev, puntos, %, por qué
 reparto disputa 2026-10-16 nyroxt 4.5 "el bug era más difícil de lo que vio el juez"
 reparto reevaluar 2026-10-16        # tras corregir un peso: nueva versión, anunciada
 ```
+
+## Cambiar de proyecto (repo)
+
+Cada proyecto es un bloque `[[proyecto]]` en `/etc/reparto/config.toml`:
+
+```toml
+[[proyecto]]
+repo = "Discayama/cliente-nuevo"
+inicio = "2026-11-01"   # día en que arranca: lo anterior no cuenta
+```
+
+- **Empezar un proyecto nuevo:** se añade su bloque. El servicio lo recoge en la siguiente
+  vuelta del timer, desde su `inicio`. El token de GitHub debe poder leer ese repo.
+- **Terminar uno:** se borra su bloque (o se deja, si aún hay trabajo). Su historial y su
+  acumulado quedan en la base de datos y se siguen consultando con `reparto ver --repo …`.
+- Cada proyecto tiene su propio acumulado: el % de un cliente no se mezcla con el de otro.
+- Con varios bloques activos, `--repo owner/nombre` elige uno en `ver`, `disputa` y `reevaluar`.
 
 ## Reparto
 
