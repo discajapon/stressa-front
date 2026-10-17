@@ -111,7 +111,7 @@ def guardar_commit(gh, con, cfg, repo, dia, sha, rama, pesos, lote):
     prs = gh.get(f"/repos/{repo}/commits/{sha}/pulls")
     archivos = c.get("files", [])
     marcas = clasificar(archivos)
-    pid = None if len(c["parents"]) > 1 else patch_id(gh.diff(f"/repos/{repo}/commits/{sha}"))
+    pid = None if len(c["parents"]) > 1 else patch_id(gh.texto(f"/repos/{repo}/commits/{sha}", "diff"))
     ruido = _ruido_commit(gh, con, repo, sha, c, prs, marcas, pid, lote)
     nums = refs_issues(
         [c["commit"]["message"]] + [f"{p['title']}\n{p['body'] or ''}" for p in prs],
