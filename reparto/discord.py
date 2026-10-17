@@ -3,88 +3,92 @@ import io
 import json
 import math
 from functools import lru_cache
+from pathlib import Path
 
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
-FONDO, TEXTO, TEXTO_2 = "#1a1a19", "#f0efec", "#c3c2b7"
-# Paleta categórica validada para fondo oscuro (CVD y contraste). El color sigue al dev, no a su puesto.
-COLORES = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
+FUENTES = Path(__file__).parent / "fuentes"
+# Design system de Discayama, tema Obsidiana.
+FONDO = "#0B0A08"    # --bg-base
+TEXTO = "#F6F2E9"    # --texto-fuerte
+TEXTO_2 = "#948D80"  # --texto-suave
+ORO = "#E3C25C"      # --oro-300: la marca
+BORDE = "#211F1C"    # --borde-sutil sobre --bg-base
+# Solo para un dev sin foto de GitHub: oro y tonos de refracción del design system.
+RESPALDO = ["#D4AF37", "#8FB6D9", "#E39A8C", "#55A87A", "#F5C86B", "#6A8FD4"]
 R = 120  # radio de cada torta
+W, H = 1160, 520
 
 
 @lru_cache
-def avatar(login, lado):
-    """Foto de perfil de GitHub recortada en círculo; None si no se puede bajar (la torta sale igual)."""
+def fuente(familia, tam, peso):
+    f = ImageFont.truetype(str(FUENTES / f"{familia}.ttf"), tam)
+    f.set_variation_by_axes([peso])
+    return f
+
+
+@lru_cache
+def foto(login, lado):
+    """Foto de perfil de GitHub, cuadrada; None si no se puede bajar (la torta sale igual)."""
     try:
         r = requests.get(f"https://github.com/{login}.png", params={"size": lado * 2}, timeout=10)
         r.raise_for_status()
-        foto = Image.open(io.BytesIO(r.content)).convert("RGB").resize((lado, lado), Image.LANCZOS)
+        return Image.open(io.BytesIO(r.content)).convert("RGB").resize((lado, lado), Image.LANCZOS)
     except (requests.RequestException, OSError):
         return None
-    # Máscara dibujada a 4x y reducida: borde suave.
-    mascara = Image.new("L", (lado * 4, lado * 4))
-    ImageDraw.Draw(mascara).ellipse((0, 0, lado * 4 - 1, lado * 4 - 1), fill=255)
-    foto.putalpha(mascara.resize((lado, lado), Image.LANCZOS))
-    return foto
 
 
-def _pegar_avatar(img, d, login, cx, cy, lado, color):
-    """Foto centrada en (cx, cy) con un aro del color del dev; si no hay foto, no dibuja nada."""
-    foto = avatar(login, lado)
-    if foto is None:
-        return
-    x, y = round(cx - lado / 2), round(cy - lado / 2)
-    d.ellipse((x - 3, y - 3, x + lado + 2, y + lado + 2), fill=color)
-    img.paste(foto, (x, y), foto)
+def _mascara(lado, desde=-90, hasta=270):
+    """Porción de círculo (o círculo entero) con borde suave: se dibuja a 4x y se reduce."""
+    m = Image.new("L", (lado * 4, lado * 4))
+    ImageDraw.Draw(m).pieslice((0, 0, lado * 4 - 1, lado * 4 - 1), desde, hasta, fill=255)
+    return m.resize((lado, lado), Image.LANCZOS)
 
 
-def _torta(img, d, cx, cy, titulo, pct, color):
-    f = ImageFont.load_default(size=20)
-    d.text((cx, 28), titulo, fill=TEXTO, font=ImageFont.load_default(size=24), anchor="ma")
-    angulo = -90.0
-    cortes, fotos = [], []
+def _relleno(login, lado, respaldo):
+    return foto(login, lado) or Image.new("RGB", (lado, lado), respaldo[login])
+
+
+def _torta(img, d, cx, cy, titulo, pct, respaldo):
+    d.text((cx, 100), titulo, fill=TEXTO, font=fuente("FamiljenGrotesk", 26, 600), anchor="ma")
+    f = fuente("PublicSans", 18, 500)
+    angulo, cortes = -90.0, []
     for dev, p in pct.items():
         if p <= 0:
             continue
         fin = angulo + p * 3.6
-        d.pieslice((cx - R, cy - R, cx + R, cy + R), angulo, fin, fill=color[dev])
+        # La porción es la foto del dev recortada: sin color debajo.
+        img.paste(_relleno(dev, 2 * R, respaldo), (cx - R, cy - R), _mascara(2 * R, angulo, fin))
         medio = math.radians((angulo + fin) / 2)
         cos, sen = math.cos(medio), math.sin(medio)
         ancla = "lm" if cos > 0.3 else "rm" if cos < -0.3 else ("mt" if sen > 0 else "mb")
-        d.text((cx + (R + 14) * cos, cy + (R + 14) * sen), f"{dev} {p}%", fill=TEXTO, font=f, anchor=ancla)
-        # Foto del dev dentro de su porción: llena el círculo si es el 100%; si la porción es muy
-        # estrecha (< 50°) no cabe y queda solo la etiqueta.
-        if p == 100:
-            fotos.append((dev, cx, cy, 2 * R - 12))
-        elif fin - angulo >= 50:
-            fotos.append((dev, cx + 0.58 * R * cos, cy + 0.58 * R * sen, 52))
+        d.text((cx + (R + 14) * cos, cy + (R + 14) * sen), f"{dev}  {p}%", fill=TEXTO, font=f, anchor=ancla)
         cortes.append(angulo)
         angulo = fin
-    if len(cortes) > 1:  # separación de 2-3 px entre porciones
+    if len(cortes) > 1:  # separación entre porciones, del color del fondo
         for a in cortes:
             r = math.radians(a)
-            d.line((cx, cy, cx + R * math.cos(r), cy + R * math.sin(r)), fill=FONDO, width=3)
-    for dev, x, y, lado in fotos:
-        _pegar_avatar(img, d, dev, x, y, lado, color[dev])
+            d.line((cx, cy, cx + R * math.cos(r), cy + R * math.sin(r)), fill=FONDO, width=4)
 
 
 def imagen(dia, pct_dia, pct_total, devs):
-    """PNG con la torta del día y la del proyecto; `devs` en orden fijo decide el color de cada uno."""
-    color = {dev: COLORES[i % len(COLORES)] for i, dev in enumerate(devs)}
-    img = Image.new("RGB", (1160, 430), FONDO)
+    """PNG con la torta del día y la del proyecto, con la estética del design system de Discayama."""
+    respaldo = {dev: RESPALDO[i % len(RESPALDO)] for i, dev in enumerate(devs)}
+    img = Image.new("RGB", (W, H), FONDO)
     d = ImageDraw.Draw(img)
-    _torta(img, d, 290, 215, f"Hoy {dia:%d/%m}", pct_dia, color)
-    _torta(img, d, 870, 215, "Proyecto acumulado", pct_total, color)
-    # Leyenda: la identidad nunca depende solo del color.
-    f = ImageFont.load_default(size=18)
-    x = 580 - 85 * len(devs)
+    d.text((40, 30), "Discayama", fill=ORO, font=fuente("FamiljenGrotesk", 34, 600), anchor="la")
+    d.text((W - 40, 40), f"Reparto · {dia:%d/%m/%Y}", fill=TEXTO_2, font=fuente("PublicSans", 18, 400),
+           anchor="ra")
+    d.line((40, 84, W - 40, 84), fill=BORDE, width=1)
+    _torta(img, d, 290, 300, "Hoy", pct_dia, respaldo)
+    _torta(img, d, 870, 300, "Proyecto acumulado", pct_total, respaldo)
+    # Leyenda: foto y nombre de cada dev del proyecto.
+    f = fuente("PublicSans", 16, 400)
+    x = W // 2 - 85 * len(devs)
     for dev in devs:
-        if avatar(dev, 22) is None:
-            d.rounded_rectangle((x, 392, x + 16, 408), radius=4, fill=color[dev])
-        else:
-            _pegar_avatar(img, d, dev, x + 8, 400, 22, color[dev])
-        d.text((x + 26, 400), dev, fill=TEXTO_2, font=f, anchor="lm")
+        img.paste(_relleno(dev, 24, respaldo), (x, 474), _mascara(24))
+        d.text((x + 32, 486), dev, fill=TEXTO_2, font=f, anchor="lm")
         x += 170
     buf = io.BytesIO()
     img.save(buf, "PNG")
