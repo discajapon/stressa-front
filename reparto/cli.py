@@ -6,6 +6,7 @@ from . import config, db
 from .github import GitHub
 from .juez import evaluar_dia
 from .recolectar import dia_cerrado, recolectar
+from .servicio import disputa, reevaluar, tick
 
 
 def _proyectos(cfg, repo):
@@ -64,6 +65,16 @@ def main():
     e.add_argument("--dia", type=date.fromisoformat)
     e.add_argument("--repo")
     e.add_argument("--forzar", action="store_true", help="nueva versión aunque nada haya cambiado")
+    sub.add_parser("tick", help="una vuelta del servicio: recoger, evaluar en orden y publicar (lo usa el timer)")
+    d = sub.add_parser("disputa", help="reemplaza los puntos de un dev en un día, con motivo")
+    d.add_argument("dia", type=date.fromisoformat)
+    d.add_argument("dev", help="cuenta de GitHub")
+    d.add_argument("puntos", type=float)
+    d.add_argument("motivo")
+    d.add_argument("--repo")
+    re_ = sub.add_parser("reevaluar", help="nueva versión de un día con los pesos actuales, y la anuncia")
+    re_.add_argument("dia", type=date.fromisoformat)
+    re_.add_argument("--repo")
     v = sub.add_parser("ver", help="muestra lo recogido de un día")
     v.add_argument("dia", type=date.fromisoformat)
     v.add_argument("--repo")
@@ -84,6 +95,16 @@ def main():
             if evaluar_dia(cfg, gh, con, p.repo, dia, a.forzar) is None:
                 print(f"{dia} · {p.repo}: sin aportes útiles, nada que evaluar")
             ver(con, p.repo, dia)
+    elif a.cmd == "tick":
+        tick(cfg, GitHub(cfg.github_token), con)
+    elif a.cmd == "disputa":
+        [p] = _proyectos(cfg, a.repo)[:1]
+        original = disputa(cfg, con, p.repo, a.dia, a.dev, a.puntos, a.motivo)
+        print(f"{a.dev} el {a.dia}: {original:.2f} → {a.puntos:.2f} puntos. Anunciado en Discord.")
+    elif a.cmd == "reevaluar":
+        [p] = _proyectos(cfg, a.repo)[:1]
+        reevaluar(cfg, GitHub(cfg.github_token), con, p.repo, a.dia)
+        ver(con, p.repo, a.dia)
     else:
         for p in _proyectos(cfg, a.repo):
             ver(con, p.repo, a.dia)
