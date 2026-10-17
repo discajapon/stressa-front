@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from reparto.recolectar import atribuir, dia_cerrado, peso_de, refs_issues, ventana
+from reparto.juez import trozos, validar
 from reparto.ruido import clasificar
 
 GYE = ZoneInfo("America/Guayaquil")  # UTC-5
@@ -76,6 +77,39 @@ def test_peso_de():
     assert peso_de(e("peso:5", "frontend")) == (5.0, False)
     assert peso_de(e("Peso: 2.5", "peso:8", "Bug")) == (8.0, True)
     assert peso_de(e("bugfix")) == (None, False)
+
+
+def test_validar():
+    ok = lambda **k: {"ref": "c:1", "categoria": "codigo", "issue": 12, "peso_estimado": None,
+                      "avance": 0.4, "calidad": 1.0, "razonamiento": "x", **k}
+    refs, issues = ["c:1"], {12}
+    assert validar({"aportes": [ok()]}, refs, issues)[0]["issue"] == 12
+    # review con tope, ruido a cero, Issue inexistente pasa a estimado
+    assert validar({"aportes": [ok(categoria="review", avance=0.9)]}, refs, issues)[0]["avance"] == 0.3
+    assert validar({"aportes": [ok(categoria="ruido", avance=0.5)]}, refs, issues)[0]["avance"] == 0
+    e = validar({"aportes": [ok(issue=99, peso_estimado=3)]}, refs, issues)[0]
+    assert (e["issue"], e["peso_estimado"]) == (None, 3)
+    for malo in ({"aportes": []}, {"aportes": [ok(ref="c:2")]}, {"aportes": [ok(calidad=2)]},
+                 {"aportes": [ok(issue=None)]}, {"aportes": [ok(razonamiento=" ")]}, {}):
+        try:
+            validar(malo, refs, issues)
+        except ValueError:
+            continue
+        raise AssertionError(f"debió rechazar {malo}")
+
+
+def test_trozos():
+    a = [("c1", "## c1\n", [("d" * 20, None)]),
+         ("c2", "## c2\n", [("x" * 50, "y" * 30), ("z" * 50, None)]),
+         ("c3", "## c3\n", [("w" * 500, None)])]
+    for limite in (90, 200, 1000):
+        r = trozos(a, limite)
+        assert all(len(t) <= limite for t, _ in r), limite
+        assert {ref for _, refs in r for ref in refs} == {"c1", "c2", "c3"}
+        assert r == trozos(a, limite)  # determinista
+    assert len(trozos(a, 1000)) == 1
+    assert [refs for _, refs in trozos(a, 90)] == [["c1"], ["c2"], ["c2"], ["c3"]]
+    assert "(fragmento)" in trozos(a, 90)[1][0]
 
 
 if __name__ == "__main__":
