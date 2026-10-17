@@ -5,6 +5,7 @@ import subprocess
 from collections import Counter
 from datetime import datetime, time, timedelta, timezone
 
+from .db import guardar_pesos
 from .ruido import clasificar
 
 # ponytail: un commit con fecha de más de 30 días antes del corte no se descubre; subir si pasa.
@@ -152,3 +153,22 @@ def guardar_reviews(gh, con, cfg, repo, dia, ini, fin, pesos):
                  json.dumps(sorted(nums)), ruido,
                  json.dumps({"pr": n, "titulo_pr": pr["title"], "estado": r["state"], "comentarios": k},
                             ensure_ascii=False)))
+
+
+def recolectar(cfg, gh, con, proyecto, dia):
+    """Recoge y guarda todo lo nuevo hasta el corte de `dia`. Todo o nada; repetirlo no duplica."""
+    repo = proyecto.repo
+    ini, fin = ventana(dia, cfg)
+    desde = max(ventana(proyecto.inicio, cfg)[0], fin - MARGEN)
+    pesos = issues(gh, repo)
+    guardar_pesos(con, repo, dia, pesos)
+    nuevos = commits_nuevos(gh, con, repo, desde, fin)
+    # En orden de fecha: el original queda antes que su copia por rebase o squash.
+    for sha, (_, rama) in sorted(nuevos.items(), key=lambda kv: kv[1][0]):
+        guardar_commit(gh, con, cfg, repo, dia, sha, rama, pesos, nuevos.keys())
+    guardar_reviews(gh, con, cfg, repo, dia, ini, fin, pesos)
+    utiles = con.execute(
+        "SELECT count(*) FROM aportes WHERE repo=? AND dia=? AND ruido IS NULL", (repo, str(dia))).fetchone()[0]
+    con.execute("INSERT OR REPLACE INTO dias VALUES (?, ?, ?, ?)",
+                (repo, str(dia), "recolectado" if utiles else "sin_actividad", datetime.now(timezone.utc).isoformat()))
+    con.commit()
