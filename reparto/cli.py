@@ -7,13 +7,15 @@ from .calculo import porcentajes, puntos_dia, puntos_juicios
 from .github import GitHub
 from .juez import evaluar_dia
 from .recolectar import dia_cerrado, recolectar
-from .servicio import disputa, reevaluar, tick
+from .servicio import anunciar_cambio, cambiar, disputa, reevaluar, tick
 
 
-def _proyectos(cfg, repo):
-    ps = [p for p in cfg.proyectos if repo in (None, p.repo)]
+def _proyectos(con, repo):
+    """El proyecto de --repo (activo o cerrado) o, si no se indica, el activo."""
+    ps = [p for p in db.proyectos(con, solo_activos=repo is None) if repo in (None, p.repo)]
     if not ps:
-        raise SystemExit(f"Repo no configurado: {repo}")
+        raise SystemExit(f"Proyecto no registrado: {repo}" if repo else
+                         "No hay proyecto activo: usa /cambiar en Discord o `reparto cambiar <url>`")
     return ps
 
 
@@ -79,6 +81,8 @@ def main():
     e.add_argument("--dia", type=date.fromisoformat)
     e.add_argument("--repo")
     e.add_argument("--forzar", action="store_true", help="nueva versión aunque nada haya cambiado")
+    c = sub.add_parser("cambiar", help="activa otro repo desde hoy y cierra el actual (igual que /cambiar)")
+    c.add_argument("url", help="URL del repositorio de GitHub")
     sub.add_parser("tick", help="una vuelta del servicio: recoger, evaluar en orden y publicar (lo usa el timer)")
     d = sub.add_parser("disputa", help="reemplaza los puntos de un dev en un día, con motivo")
     d.add_argument("dia", type=date.fromisoformat)
@@ -99,28 +103,35 @@ def main():
     if a.cmd == "recolectar":
         dia = a.dia or dia_cerrado(datetime.now(timezone.utc), cfg)
         gh = GitHub(cfg.github_token)
-        for p in _proyectos(cfg, a.repo):
+        for p in _proyectos(con, a.repo):
             recolectar(cfg, gh, con, p, dia)
             ver(con, p.repo, dia)
     elif a.cmd == "evaluar":
         dia = a.dia or dia_cerrado(datetime.now(timezone.utc), cfg)
         gh = GitHub(cfg.github_token)
-        for p in _proyectos(cfg, a.repo):
+        for p in _proyectos(con, a.repo):
             if evaluar_dia(cfg, gh, con, p.repo, dia, a.forzar) is None:
                 print(f"{dia} · {p.repo}: sin aportes útiles, nada que evaluar")
             ver(con, p.repo, dia)
+    elif a.cmd == "cambiar":
+        try:
+            repo, cerrados = cambiar(cfg, GitHub(cfg.github_token), con, a.url, "CLI")
+        except ValueError as e:
+            raise SystemExit(str(e))
+        anunciar_cambio(cfg, con, repo, cerrados, "CLI")
+        print(f"Proyecto activo: {repo}" + (f" (cerrado: {', '.join(cerrados)})" if cerrados else ""))
     elif a.cmd == "tick":
         tick(cfg, GitHub(cfg.github_token), con)
     elif a.cmd == "disputa":
-        [p] = _proyectos(cfg, a.repo)[:1]
+        [p] = _proyectos(con, a.repo)[:1]
         original = disputa(cfg, con, p.repo, a.dia, a.dev, a.puntos, a.motivo)
         print(f"{a.dev} el {a.dia}: {original:.2f} → {a.puntos:.2f} puntos. Anunciado en Discord.")
     elif a.cmd == "reevaluar":
-        [p] = _proyectos(cfg, a.repo)[:1]
+        [p] = _proyectos(con, a.repo)[:1]
         reevaluar(cfg, GitHub(cfg.github_token), con, p.repo, a.dia)
         ver(con, p.repo, a.dia)
     else:
-        for p in _proyectos(cfg, a.repo):
+        for p in _proyectos(con, a.repo):
             ver(con, p.repo, a.dia)
 
 
