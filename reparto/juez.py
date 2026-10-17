@@ -183,11 +183,12 @@ def _juzgar(cfg, sistema, usuario, refs, issues):
     raise RuntimeError(f"el juez devolvió una salida inválida 3 veces: {error}")
 
 
-def evaluar_dia(cfg, gh, con, repo, dia, forzar=False):
+def evaluar_dia(cfg, gh, con, repo, dia, forzar=False, pesos_al=None):
     """Evalúa los aportes útiles del día y guarda una evaluación nueva como vigente.
 
     Si las entradas no cambiaron desde la evaluación vigente, la devuelve sin llamar al
-    juez (salvo `forzar`). Devuelve el id de la evaluación, o None si no hubo actividad.
+    juez (salvo `forzar`). `pesos_al` usa los pesos vigentes en otra fecha (al reevaluar tras
+    corregir un peso). Devuelve el id de la evaluación, o None si no hubo actividad.
     """
     cols = ("dev", "tipo", "ref", "issues", "detalle")
     filas = [dict(zip(cols, f)) for f in con.execute(
@@ -196,7 +197,7 @@ def evaluar_dia(cfg, gh, con, repo, dia, forzar=False):
         (repo, str(dia)))]
     if not filas:
         return None
-    pesos = pesos_vigentes(con, repo, dia)
+    pesos = pesos_vigentes(con, repo, pesos_al or dia)
     sistema = PROMPT.read_text()
     prompt = f"{VERSION}:{_sha(sistema)[:12]}"
     h = _sha(json.dumps([prompt, cfg.llm_modelo, [[f[k] for k in cols[:4]] for f in filas], sorted(pesos.items())]))
