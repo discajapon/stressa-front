@@ -23,7 +23,7 @@ def ver(con, repo, dia):
         " ORDER BY dev IS NULL, dev, login, fecha", (repo, str(dia)))
     actual = None
     for dev, login, tipo, ref, issues, ruido, detalle in filas:
-        quien = dev or f"(sin dev) {login}"
+        quien = dev or (f"(bot, no cuenta) {login}" if login else "(sin cuenta: añadir su email en [emails])")
         if quien != actual:
             print(f"  {quien}")
             actual = quien
