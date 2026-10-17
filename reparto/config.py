@@ -23,6 +23,7 @@ class Config:
     llm_modelo: str
     llm_contexto: int  # tokens
     llm_clave: str | None  # solo hace falta para evaluar
+    discord_webhook: str | None  # solo hace falta para publicar
 
 
 def cargar(ruta=None):
@@ -43,4 +44,5 @@ def cargar(ruta=None):
         llm_modelo=c["llm"]["modelo"],
         llm_contexto=c["llm"].get("contexto", 131072),
         llm_clave=os.environ.get("LLM_CLAVE"),
+        discord_webhook=os.environ.get("DISCORD_WEBHOOK"),
     )

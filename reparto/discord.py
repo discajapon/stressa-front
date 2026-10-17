@@ -1,7 +1,9 @@
 """Salida pública: la torta como imagen y los avisos, publicados en Discord por webhook."""
 import io
+import json
 import math
 
+import requests
 from PIL import Image, ImageDraw, ImageFont
 
 FONDO, TEXTO, TEXTO_2 = "#1a1a19", "#f0efec", "#c3c2b7"
@@ -49,3 +51,16 @@ def imagen(dia, pct_dia, pct_total, devs):
     buf = io.BytesIO()
     img.save(buf, "PNG")
     return buf.getvalue()
+
+
+def enviar(cfg, texto, png=None):
+    """Publica en el canal del webhook. Sin menciones: nadie recibe un ping por el reparto."""
+    if not cfg.discord_webhook:
+        raise SystemExit("Falta DISCORD_WEBHOOK en el entorno")
+    r = requests.post(
+        cfg.discord_webhook,
+        data={"payload_json": json.dumps({"content": texto[:2000], "allowed_mentions": {"parse": []}})},
+        files={"file": ("reparto.png", png, "image/png")} if png else None,
+        timeout=30,
+    )
+    r.raise_for_status()

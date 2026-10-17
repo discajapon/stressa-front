@@ -1,5 +1,5 @@
 # Copiar fuera del repo (por defecto /etc/reparto/config.toml, o la ruta en REPARTO_CONFIG).
-# Las credenciales NO van aquí: GITHUB_TOKEN y LLM_CLAVE se leen del entorno.
+# Las credenciales NO van aquí: GITHUB_TOKEN, LLM_CLAVE y DISCORD_WEBHOOK se leen del entorno.
 
 db = "/var/lib/reparto/reparto.db"
 zona = "America/Guayaquil"
