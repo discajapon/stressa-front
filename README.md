@@ -17,8 +17,8 @@ sudo python3 -m venv /opt/reparto/.venv && sudo /opt/reparto/.venv/bin/pip insta
 sudo mkdir -p /etc/reparto /var/lib/reparto && sudo chown reparto /var/lib/reparto
 sudo cp /opt/reparto/config.example.toml /etc/reparto/config.toml   # y editarlo
 sudo install -m 600 -o reparto /dev/null /etc/reparto/env           # y poner las credenciales
-sudo cp /opt/reparto/deploy/reparto.{service,timer} /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now reparto.timer
+sudo cp /opt/reparto/deploy/reparto{.service,.timer,-bot.service} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now reparto.timer reparto-bot.service
 ```
 
 Credenciales solo por entorno (`/etc/reparto/env`, permisos 600), nunca en el repo:
@@ -27,6 +27,7 @@ Credenciales solo por entorno (`/etc/reparto/env`, permisos 600), nunca en el re
   (Contents, Issues, Pull requests, Metadata).
 - `LLM_CLAVE`: clave del servidor del juez (supercomputador).
 - `DISCORD_WEBHOOK`: webhook del canal #reparto.
+- `DISCORD_BOT_TOKEN`: token del bot que atiende `/cambiar`.
 - `REPARTO_CONFIG` (opcional): ruta de la config si no es `/etc/reparto/config.toml`.
 
 ## Uso
@@ -48,20 +49,28 @@ reparto reevaluar 2026-10-16        # tras corregir un peso: nueva versión, anu
 
 ## Cambiar de proyecto (repo)
 
-Cada proyecto es un bloque `[[proyecto]]` en `/etc/reparto/config.toml`:
+En Discord, el dueño del servidor escribe:
 
-```toml
-[[proyecto]]
-repo = "Discayama/cliente-nuevo"
-inicio = "2026-11-01"   # día en que arranca: lo anterior no cuenta
+```
+/cambiar repo:https://github.com/Discayama/cliente-nuevo
 ```
 
-- **Empezar un proyecto nuevo:** se añade su bloque. El servicio lo recoge en la siguiente
-  vuelta del timer, desde su `inicio`. El token de GitHub debe poder leer ese repo.
-- **Terminar uno:** se borra su bloque (o se deja, si aún hay trabajo). Su historial y su
-  acumulado quedan en la base de datos y se siguen consultando con `reparto ver --repo …`.
+- El repo nuevo pasa a ser el proyecto activo **desde hoy**; lo anterior no cuenta.
+- El proyecto que estaba activo se cierra y en #reparto se anuncia su **reparto final**.
+  Su historial y su acumulado quedan guardados (`reparto ver <día> --repo owner/nombre`).
+- Antes de cambiar se comprueba que la URL sea de GitHub y que el token pueda leer el repo.
+- Solo el dueño del servidor puede usarlo; a cualquier otro le responde "no autorizado".
+- Lo mismo desde el VPS: `reparto cambiar https://github.com/Discayama/cliente-nuevo`.
 - Cada proyecto tiene su propio acumulado: el % de un cliente no se mezcla con el de otro.
-- Con varios bloques activos, `--repo owner/nombre` elige uno en `ver`, `disputa` y `reevaluar`.
+
+### Crear el bot (una vez)
+
+1. https://discord.com/developers/applications → **New Application** → nombre `Reparto`.
+2. **Bot** → **Reset Token** → copiar el token a `DISCORD_BOT_TOKEN` en `/etc/reparto/env`.
+   No hace falta ningún intent privilegiado.
+3. **OAuth2 → URL Generator**: scopes `bot` y `applications.commands`, sin permisos.
+   Abrir la URL generada y añadir el bot a Discayama.
+4. `sudo systemctl restart reparto-bot` y `/cambiar` aparece en el servidor.
 
 ## Reparto
 
