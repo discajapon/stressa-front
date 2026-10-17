@@ -95,13 +95,24 @@ def imagen(dia, pct_dia, pct_total, devs):
     return buf.getvalue()
 
 
-def enviar(cfg, texto, png=None):
-    """Publica en el canal del webhook. Sin menciones: nadie recibe un ping por el reparto."""
+# Color de la franja de cada mensaje (embed), del design system.
+COLOR_ORO = 0xD4AF37    # --oro-400: reparto, cambios de proyecto
+COLOR_AVISO = 0xE08A3C  # --aviso-500: día pendiente, disputas
+
+
+def enviar(cfg, titulo, texto, png=None, color=COLOR_ORO, pie=None):
+    """Publica una tarjeta en el canal del webhook. Sin menciones: nadie recibe un ping por el reparto."""
     if not cfg.discord_webhook:
         raise SystemExit("Falta DISCORD_WEBHOOK en el entorno")
+    tarjeta = {"title": titulo[:256], "description": texto[:4096], "color": color}
+    if png:
+        tarjeta["image"] = {"url": "attachment://reparto.png"}
+    if pie:
+        tarjeta["footer"] = {"text": pie}
     r = requests.post(
         cfg.discord_webhook,
-        data={"payload_json": json.dumps({"content": texto[:2000], "allowed_mentions": {"parse": []}})},
+        data={"payload_json": json.dumps({"username": "Reparto Discayama", "embeds": [tarjeta],
+                                          "allowed_mentions": {"parse": []}})},
         files={"file": ("reparto.png", png, "image/png")} if png else None,
         timeout=30,
     )
