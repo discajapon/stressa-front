@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 
 from . import config, db
 from .github import GitHub
+from .juez import evaluar_dia
 from .recolectar import dia_cerrado, recolectar
 
 
@@ -34,6 +35,22 @@ def ver(con, repo, dia):
             linea = f"review PR#{d['pr']} {d['estado'].lower()} ({d['comentarios']} comentarios)"
         iss = " ".join(f"#{n}" for n in json.loads(issues)) or "sin Issue"
         print(f"    {'·' if ruido is None else '✗'} {linea} [{iss}]" + (f" — ruido: {ruido}" if ruido else ""))
+    ev = con.execute("SELECT id, version, prompt, modelo, creada FROM evaluaciones WHERE repo=? AND dia=? AND vigente=1",
+                     (repo, str(dia))).fetchone()
+    if not ev:
+        return
+    print(f"\n  Evaluación v{ev[1]} · {ev[2]} · {ev[3]} · {ev[4][:16]}")
+    actual = None
+    for dev, ref, tipo, cat, issue, peso, avance, calidad, razon in con.execute(
+            "SELECT dev, ref, tipo, categoria, issue, peso, avance, calidad, razonamiento FROM juicios"
+            " WHERE evaluacion=? ORDER BY dev, rowid", (ev[0],)):
+        if dev != actual:
+            print(f"  {dev}")
+            actual = dev
+        donde = f"#{issue}" if issue else "SIN ISSUE"
+        peso = "-" if peso is None else f"{peso:g}"
+        print(f"    {tipo} {ref[:10]} {cat}: {donde} peso {peso} · avance {avance:.2f} · calidad {calidad:.2f}")
+        print(f"      {razon}")
 
 
 def main():
@@ -43,6 +60,10 @@ def main():
     r = sub.add_parser("recolectar", help="recoge los aportes de un día (por defecto, el último cerrado)")
     r.add_argument("--dia", type=date.fromisoformat)
     r.add_argument("--repo")
+    e = sub.add_parser("evaluar", help="evalúa con el juez un día ya recolectado")
+    e.add_argument("--dia", type=date.fromisoformat)
+    e.add_argument("--repo")
+    e.add_argument("--forzar", action="store_true", help="nueva versión aunque nada haya cambiado")
     v = sub.add_parser("ver", help="muestra lo recogido de un día")
     v.add_argument("dia", type=date.fromisoformat)
     v.add_argument("--repo")
@@ -55,6 +76,13 @@ def main():
         gh = GitHub(cfg.github_token)
         for p in _proyectos(cfg, a.repo):
             recolectar(cfg, gh, con, p, dia)
+            ver(con, p.repo, dia)
+    elif a.cmd == "evaluar":
+        dia = a.dia or dia_cerrado(datetime.now(timezone.utc), cfg)
+        gh = GitHub(cfg.github_token)
+        for p in _proyectos(cfg, a.repo):
+            if evaluar_dia(cfg, gh, con, p.repo, dia, a.forzar) is None:
+                print(f"{dia} · {p.repo}: sin aportes útiles, nada que evaluar")
             ver(con, p.repo, dia)
     else:
         for p in _proyectos(cfg, a.repo):

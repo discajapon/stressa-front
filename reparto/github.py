@@ -27,7 +27,7 @@ class GitHub:
                 return
             r = self.s.get(r.links["next"]["url"], timeout=30)
 
-    def diff(self, ruta):
-        """Diff en texto plano; None si GitHub no lo entrega (demasiado grande)."""
-        r = self.s.get(API + ruta, headers={"Accept": "application/vnd.github.diff"}, timeout=60)
+    def texto(self, ruta, tipo, **params):
+        """Contenido en texto plano (tipo "diff" o "raw"); None si GitHub no lo entrega."""
+        r = self.s.get(API + ruta, params=params, headers={"Accept": f"application/vnd.github.{tipo}"}, timeout=60)
         return r.text if r.ok else None
