@@ -45,7 +45,17 @@ CREATE TABLE IF NOT EXISTS juicios (
     avance REAL, calidad REAL,
     razonamiento TEXT
 );
+-- Disca reemplaza los puntos de un dev en un día. Se guarda el valor original y el motivo.
+-- Vale para la evaluación indicada; si el día se reevalúa, la disputa queda en el historial.
+CREATE TABLE IF NOT EXISTS disputas (
+    id INTEGER PRIMARY KEY,
+    evaluacion INTEGER REFERENCES evaluaciones (id),
+    dev TEXT, original REAL, nuevo REAL, motivo TEXT, creada TEXT
+);
 """
+# Estados de un día: recolectado → evaluado → publicado.
+# sin_actividad: nada útil que evaluar. pendiente_juez: el supercomputador no respondió (ya avisado).
+# sin_puntos: el juez no dio puntos a nadie; no hay torta.
 
 
 def abrir(ruta):
