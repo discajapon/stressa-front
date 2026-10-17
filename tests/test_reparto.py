@@ -11,7 +11,7 @@ from reparto.recolectar import atribuir, dia_cerrado, peso_de, refs_issues, vent
 from reparto.ruido import clasificar
 
 GYE = ZoneInfo("America/Guayaquil")  # UTC-5
-cfg = SimpleNamespace(zona=GYE, corte="00:00", devs={"disca_japon": "Disca"}, emails={"a@pc.local": "disca_japon"})
+cfg = SimpleNamespace(zona=GYE, corte="00:00", devs={"discajapon": "Disca"}, emails={"a@pc.local": "discajapon"})
 
 
 def test_ventana():
@@ -58,11 +58,11 @@ def test_clasificar():
 
 
 def test_atribuir():
-    con_cuenta = {"author": {"login": "disca_japon"}, "commit": {"author": {"email": "x@y"}}}
+    con_cuenta = {"author": {"login": "discajapon"}, "commit": {"author": {"email": "x@y"}}}
     sin_cuenta = {"author": None, "commit": {"author": {"email": "A@PC.local"}}}
     ajeno = {"author": {"login": "otro"}, "commit": {"author": {"email": "o@y"}}}
-    assert atribuir(con_cuenta, cfg) == ("disca_japon", "Disca")
-    assert atribuir(sin_cuenta, cfg) == ("disca_japon", "Disca")
+    assert atribuir(con_cuenta, cfg) == ("discajapon", "Disca")
+    assert atribuir(sin_cuenta, cfg) == ("discajapon", "Disca")
     assert atribuir(ajeno, cfg) == ("otro", None)
 
 
