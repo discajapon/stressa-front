@@ -1,5 +1,8 @@
 """El ciclo del servicio y las correcciones de Disca. Hacia Discord solo salen porcentajes."""
+import re
 from datetime import date, datetime, timedelta, timezone
+
+import requests
 
 from .calculo import acumulado, porcentajes, puntos_dia, puntos_juicios
 from .discord import enviar, imagen
@@ -145,3 +148,31 @@ def reevaluar(cfg, gh, con, repo, dia):
     version = con.execute("SELECT version FROM evaluaciones WHERE id=?", (ev,)).fetchone()[0]
     publicar(cfg, con, repo, dia, encabezado=(
         f"🔁 **Reevaluación del {dia:%d/%m/%Y}** · {repo} (versión {version}; las anteriores quedan en el historial)"))
+
+
+URL_REPO = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$")
+
+
+def repo_de_url(url):
+    """'owner/nombre' de una URL de GitHub (https, sin esquema o terminada en .git)."""
+    m = URL_REPO.match(url.strip())
+    if not m:
+        raise ValueError(f"No es la URL de un repositorio de GitHub: {url}")
+    return f"{m[1]}/{m[2]}"
+
+
+def cambiar(cfg, gh, con, url, por):
+    """Activa el repo de `url` desde hoy y cierra el activo. Devuelve (repo nuevo, repos cerrados)."""
+    repo = repo_de_url(url)
+    try:
+        repo = gh.get(f"/repos/{repo}")["full_name"]  # nombre canónico; falla si el token no lo lee
+    except requests.HTTPError as e:
+        raise ValueError(f"El token de GitHub no puede leer {repo} (¿existe y tiene acceso?)") from e
+    cerrados = [p.repo for p in proyectos(con) if p.repo != repo]
+    if not cerrados and any(p.repo == repo for p in proyectos(con)):
+        raise ValueError(f"{repo} ya es el proyecto activo")
+    hoy = datetime.now(cfg.zona).date()
+    con.execute("UPDATE proyectos SET activo=0, cambiado=?, por=? WHERE activo=1", (_ahora(), por))
+    con.execute("INSERT OR REPLACE INTO proyectos VALUES (?, ?, 1, ?, ?)", (repo, str(hoy), _ahora(), por))
+    con.commit()
+    return repo, cerrados
