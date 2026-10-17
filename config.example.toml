@@ -1,9 +1,15 @@
 # Copiar fuera del repo (por defecto /etc/reparto/config.toml, o la ruta en REPARTO_CONFIG).
-# Las credenciales NO van aquí: GITHUB_TOKEN se lee del entorno.
+# Las credenciales NO van aquí: GITHUB_TOKEN y LLM_CLAVE se leen del entorno.
 
 db = "/var/lib/reparto/reparto.db"
 zona = "America/Guayaquil"
 corte = "00:00"   # hora local en que se cierra cada día
+
+# Único juez. Cambiar el modelo hace incomparables las notas anteriores.
+[llm]
+url = "https://ai.hpc.cedia.edu.ec/v1"
+modelo = "cedia-qwen-large-thinking"
+contexto = 131072   # tokens; medido en el servidor
 
 [[proyecto]]
 repo = "Discayama/cliente-x"

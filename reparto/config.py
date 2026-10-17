@@ -20,6 +20,10 @@ class Config:
     devs: dict[str, str]  # cuenta de GitHub -> nombre
     emails: dict[str, str]  # email de commit (minúsculas) -> cuenta de GitHub
     github_token: str
+    llm_url: str
+    llm_modelo: str
+    llm_contexto: int  # tokens
+    llm_clave: str | None  # solo hace falta para evaluar
 
 
 def cargar(ruta=None):
@@ -37,4 +41,8 @@ def cargar(ruta=None):
         devs=c.get("devs", {}),
         emails={k.casefold(): v for k, v in c.get("emails", {}).items()},
         github_token=token,
+        llm_url=c["llm"]["url"].rstrip("/"),
+        llm_modelo=c["llm"]["modelo"],
+        llm_contexto=c["llm"].get("contexto", 131072),
+        llm_clave=os.environ.get("LLM_CLAVE"),
     )
