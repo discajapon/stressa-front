@@ -18,7 +18,7 @@ Cada entrada tiene:
 
 - `ref`: la referencia exacta del aporte.
 - `categoria`: una de
-  - `codigo`: funcionalidad nueva o modificada.
+  - `codigo`: construir el proyecto, es decir, cualquier trabajo que le añade o mejora algo. Discayama hace proyectos de muchos tipos, así que no exijas que sea código de aplicación: cuentan igual funcionalidades, interfaz, infraestructura, configuración, CI, despliegue, scripts, datos o documentación que forma parte de lo que se entrega.
   - `bug`: arreglo de un fallo existente.
   - `tests`: tests que verifican comportamiento real.
   - `simplificacion`: borrar o simplificar código sin perder funcionalidad.
@@ -27,7 +27,7 @@ Cada entrada tiene:
 - `issue`: número del Issue al que sirve el trabajo. Usa los vinculados; si el trabajo sirve claramente a otro Issue de la lista, usa ese. Si no sirve a ninguno, `null`.
 - `peso_estimado`: solo si `issue` es `null` y la categoría no es `ruido`: el peso que tendría este trabajo como Issue, en la misma escala que los pesos de la lista. Si no, `null`.
 - `avance`: número de 0 a 1, según la categoría:
-  - `codigo`: fracción del Issue que este aporte completa. Un Issue terminado entre todos los aportes de todos los días suma 1.
+  - `codigo`: fracción del Issue que este aporte construye. Un Issue terminado entre todos los aportes de todos los días suma 1.
   - `bug`: DIFICULTAD del fallo, no su tamaño. 0.05 trivial (errata, valor mal copiado); 0.3 moderado (lógica equivocada a la vista); 0.6 difícil (hubo que entender una interacción no obvia, concurrencia, estado, borde raro); 0.9–1 excepcional. El número de líneas cambiadas es irrelevante.
   - `tests`: fracción del Issue cuyo comportamiento queda verificado. Tests triviales (afirmaciones que siempre se cumplen, solo instanciar objetos, copiar la salida actual sin comprobar nada) son `ruido`.
   - `simplificacion`: valor de mantenimiento ganado, como fracción del Issue. Quitar código muerto, duplicado o una abstracción innecesaria es avance real.
