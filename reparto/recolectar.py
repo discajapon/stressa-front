@@ -2,6 +2,7 @@
 import json
 import re
 import subprocess
+from collections import Counter
 from datetime import datetime, time, timedelta, timezone
 
 from .ruido import clasificar
@@ -126,3 +127,28 @@ def guardar_commit(gh, con, cfg, repo, dia, sha, rama, pesos, lote):
         " VALUES (?, ?, 'commit', ?, ?, ?, ?, ?, ?, ?, ?)",
         (repo, str(dia), sha, login, dev, c["commit"]["committer"]["date"], pid,
          json.dumps(sorted(nums & pesos.keys())), ruido, json.dumps(detalle, ensure_ascii=False)))
+
+
+def guardar_reviews(gh, con, cfg, repo, dia, ini, fin, pesos):
+    """Reviews enviadas dentro de la ventana sobre PRs de otra persona."""
+    for pr in gh.paginar(f"/repos/{repo}/pulls", state="all", sort="updated", direction="desc"):
+        if datetime.fromisoformat(pr["updated_at"]) < ini:
+            break
+        n, autor = pr["number"], pr["user"]["login"]
+        revs = [r for r in gh.paginar(f"/repos/{repo}/pulls/{n}/reviews")
+                if r.get("submitted_at") and ini <= datetime.fromisoformat(r["submitted_at"]) < fin
+                and r["user"]["login"] != autor]
+        if not revs:
+            continue
+        comentarios = Counter(c["pull_request_review_id"] for c in gh.paginar(f"/repos/{repo}/pulls/{n}/comments"))
+        nums = refs_issues([pr["title"], pr["body"]], [pr["head"]["ref"]]) & pesos.keys()
+        for r in revs:
+            login, k = r["user"]["login"], comentarios[r["id"]]
+            ruido = None if k or (r["body"] or "").strip() else "review sin comentarios"
+            con.execute(
+                "INSERT OR IGNORE INTO aportes (repo, dia, tipo, ref, login, dev, fecha, patch_id, issues, ruido, detalle)"
+                " VALUES (?, ?, 'review', ?, ?, ?, ?, NULL, ?, ?, ?)",
+                (repo, str(dia), str(r["id"]), login, cfg.devs.get(login), r["submitted_at"],
+                 json.dumps(sorted(nums)), ruido,
+                 json.dumps({"pr": n, "titulo_pr": pr["title"], "estado": r["state"], "comentarios": k},
+                            ensure_ascii=False)))
