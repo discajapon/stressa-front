@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS aportes (
     UNIQUE (repo, tipo, ref)
 );
 CREATE INDEX IF NOT EXISTS aportes_patch ON aportes (repo, patch_id);
+-- Historial de pesos: una fila nueva solo cuando el peso, la marca de bug o el título cambian.
+CREATE TABLE IF NOT EXISTS pesos (
+    repo TEXT, issue INTEGER, peso REAL, bug INTEGER, titulo TEXT,
+    desde TEXT  -- día en que se vio este valor por primera vez
+);
 """
 
 
@@ -28,3 +33,16 @@ def abrir(ruta):
     con = sqlite3.connect(ruta)
     con.executescript(ESQUEMA)
     return con
+
+
+def guardar_pesos(con, repo, dia, issues):
+    """Registra los Issues cuyo peso/bug/título cambió desde el último registro. Devuelve cuántos."""
+    cambios = 0
+    for n, (peso, bug, titulo) in issues.items():
+        ultimo = con.execute(
+            "SELECT peso, bug, titulo FROM pesos WHERE repo=? AND issue=? ORDER BY rowid DESC LIMIT 1",
+            (repo, n)).fetchone()
+        if ultimo != (peso, int(bug), titulo):
+            con.execute("INSERT INTO pesos VALUES (?,?,?,?,?,?)", (repo, n, peso, int(bug), titulo, str(dia)))
+            cambios += 1
+    return cambios
