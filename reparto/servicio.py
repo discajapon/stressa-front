@@ -1,8 +1,9 @@
 """El ciclo del servicio y las correcciones de Disca. Hacia Discord solo salen porcentajes."""
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from .calculo import acumulado, porcentajes, puntos_dia, puntos_juicios
 from .discord import enviar, imagen
+from .recolectar import dia_cerrado, recolectar
 
 
 def _ahora():
@@ -59,3 +60,12 @@ def publicar(cfg, con, repo, dia, encabezado=None):
     enviar(cfg, "\n".join(lineas), imagen(dia, pct_dia, pct_total, _devs(con, repo)))
     _estado(con, repo, dia, "publicado")
     return True
+
+
+def recolectar_pendientes(cfg, gh, con, proyecto, ahora):
+    """Recoge, en orden, cada día cerrado que aún no se recogió (desde el inicio del proyecto)."""
+    ultimo = con.execute("SELECT max(dia) FROM dias WHERE repo=?", (proyecto.repo,)).fetchone()[0]
+    dia = date.fromisoformat(ultimo) + timedelta(days=1) if ultimo else proyecto.inicio
+    while dia <= dia_cerrado(ahora, cfg):
+        recolectar(cfg, gh, con, proyecto, dia)
+        dia += timedelta(days=1)
