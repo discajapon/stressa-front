@@ -14,7 +14,7 @@ la balanza interna y se consultan con `reparto ver`.
 
 ```sh
 sudo useradd --system --home /opt/reparto reparto
-sudo git clone https://github.com/discajapon/commit-analizer.git /opt/reparto
+sudo git clone https://github.com/discajapon/stressa-front.git /opt/reparto
 sudo python3 -m venv /opt/reparto/.venv && sudo /opt/reparto/.venv/bin/pip install -e /opt/reparto
 sudo mkdir -p /etc/reparto /var/lib/reparto && sudo chown reparto /var/lib/reparto
 sudo cp /opt/reparto/config.example.toml /etc/reparto/config.toml   # y editarlo
