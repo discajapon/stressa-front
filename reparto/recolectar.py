@@ -38,10 +38,12 @@ def dev_de(login):
 
 
 def atribuir(commit, cfg):
-    """(cuenta de GitHub, dev) del autor del commit; la cuenta sale del email si GitHub no la vincula."""
-    login = (commit.get("author") or {}).get("login")
-    if not login:
-        login = cfg.emails.get(commit["commit"]["author"]["email"].casefold())
+    """(cuenta de GitHub, dev) del autor del commit; la cuenta sale del email si GitHub no la vincula.
+
+    Si tampoco está en `[emails]`, el dev es el nombre del autor: su aporte cuenta en vez de perderse.
+    """
+    autor = commit["commit"]["author"]
+    login = (commit.get("author") or {}).get("login") or cfg.emails.get(autor["email"].casefold()) or autor.get("name")
     return login, dev_de(login)
 
 
