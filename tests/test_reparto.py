@@ -66,12 +66,12 @@ def test_atribuir():
     sin_cuenta = {"author": None, "commit": {"author": {"email": "A@PC.local"}}}
     otro = {"author": {"login": "nyroxt"}, "commit": {"author": {"email": "o@y"}}}
     bot = {"author": {"login": "dependabot[bot]"}, "commit": {"author": {"email": "b@y"}}}
-    desconocido = {"author": None, "commit": {"author": {"email": "nadie@pc"}}}
+    desconocido = {"author": None, "commit": {"author": {"email": "nadie@pc", "name": "Codex (Alfredo)"}}}
     assert atribuir(con_cuenta, cfg) == ("discajapon", "discajapon")
     assert atribuir(sin_cuenta, cfg) == ("discajapon", "discajapon")
     assert atribuir(otro, cfg) == ("nyroxt", "nyroxt")
     assert atribuir(bot, cfg) == ("dependabot[bot]", None)
-    assert atribuir(desconocido, cfg) == (None, None)
+    assert atribuir(desconocido, cfg) == ("Codex (Alfredo)", "Codex (Alfredo)")
 
 
 def test_refs_issues():
