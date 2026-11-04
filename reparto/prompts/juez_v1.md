@@ -25,7 +25,7 @@ Cada entrada tiene:
   - `review`: comentarios de review sobre el PR de otra persona.
   - `ruido`: no aporta (ver abajo).
 - `issue`: número del Issue al que sirve el trabajo. Usa los vinculados; si el trabajo sirve claramente a otro Issue de la lista, usa ese. Si no sirve a ninguno, `null`.
-- `peso_estimado`: solo si `issue` es `null` y la categoría no es `ruido`: el peso que tendría este trabajo como Issue, en la misma escala que los pesos de la lista. Si no, `null`.
+- `peso_estimado`: solo si `issue` es `null` y la categoría no es `ruido`: el peso que tendría este trabajo como Issue, en la misma escala que los pesos de la lista. Si no, `null`. Mídelo por la ingeniería que hay detrás (dificultad, alcance, riesgo, decisiones no obvias), nunca por líneas ni archivos tocados, y con la misma vara siempre: dos trabajos parecidos reciben el mismo peso. En ese caso `avance` es la fracción de ese trabajo que construye el aporte (1 si lo entrega completo).
 - `avance`: número de 0 a 1, según la categoría:
   - `codigo`: fracción del Issue que este aporte construye. Un Issue terminado entre todos los aportes de todos los días suma 1.
   - `bug`: DIFICULTAD del fallo, no su tamaño. 0.05 trivial (errata, valor mal copiado); 0.3 moderado (lógica equivocada a la vista); 0.6 difícil (hubo que entender una interacción no obvia, concurrencia, estado, borde raro); 0.9–1 excepcional. El número de líneas cambiadas es irrelevante.
