@@ -1,12 +1,16 @@
 """Puntos y porcentajes. Los puntos son internos: hacia fuera solo salen porcentajes."""
 from collections import defaultdict
 
+# ponytail: tope fijo; subirlo si un dev legítimamente hace más trabajo sin Issue en un día.
+TOPE_SIN_ISSUE = 5.0  # puntos por dev y día de trabajo sin Issue = un Issue grande
+
 
 def puntos_juicios(con, evaluacion):
     """[(dev, puntos, razonamiento)] por juicio: peso × avance × calidad.
 
     Tope por Issue en `codigo`: entre todos los devs y días un Issue no se construye más
     del 100%. Si hoy se pasa, el avance de hoy en ese Issue se escala proporcionalmente.
+    El trabajo sin Issue de un dev en el día suma como máximo TOPE_SIN_ISSUE (escalado proporcional).
     """
     repo, dia = con.execute("SELECT repo, dia FROM evaluaciones WHERE id=?", (evaluacion,)).fetchone()
     filas = con.execute(
@@ -22,8 +26,15 @@ def puntos_juicios(con, evaluacion):
         if cat == "codigo" and issue is not None:
             hoy[issue] += avance
     factor = {i: min(1.0, (1 - previo.get(i, 0.0)) / s) for i, s in hoy.items() if s}
-    return [(dev, (peso or 0) * avance * calidad * (factor.get(issue, 1.0) if cat == "codigo" else 1.0), razon)
-            for dev, cat, issue, peso, avance, calidad, razon in filas]
+    pts = [(peso or 0) * avance * calidad * (factor.get(issue, 1.0) if cat == "codigo" else 1.0)
+           for _, cat, issue, peso, avance, calidad, _ in filas]
+    # Sin Issue no hay tope por Issue: cada commit pequeño sumaría sin límite. Tope por dev y día.
+    libres = defaultdict(float)
+    for f, p in zip(filas, pts):
+        if f[2] is None:
+            libres[f[0]] += p
+    esc = {d: min(1.0, TOPE_SIN_ISSUE / t) for d, t in libres.items() if t}
+    return [(f[0], p * (esc.get(f[0], 1.0) if f[2] is None else 1.0), f[6]) for f, p in zip(filas, pts)]
 
 
 def puntos_dia(con, evaluacion):
