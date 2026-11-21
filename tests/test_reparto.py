@@ -151,6 +151,15 @@ def test_calculo():
     assert round(despues["nyroxt"] - antes["nyroxt"], 6) == 4.0 and despues["disca"] == antes["disca"]
 
 
+def test_tope_sin_issue():
+    con = abrir(":memory:")
+    # 50 commits chicos sin Issue (50 pts) contra un Issue entregado de golpe (5 pts)
+    ev = _evaluacion(con, "2026-10-16",
+                     [("disca", "codigo", None, 1, 1.0, 1.0)] * 50 + [("nyroxt", "codigo", 7, 5, 1.0, 1.0)])
+    pts = puntos_dia(con, ev)
+    assert round(pts["disca"], 6) == 5.0 and pts["nyroxt"] == 5.0
+
+
 def test_porcentajes():
     assert porcentajes({"a": 1, "b": 1, "c": 1}) == {"a": 34, "b": 33, "c": 33}
     assert porcentajes({"a": 1, "b": 1}) == {"a": 50, "b": 50}
