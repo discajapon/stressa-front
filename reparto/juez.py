@@ -15,6 +15,8 @@ TOPE_REVIEW = 0.3
 RESERVA_SALIDA = 24_000  # tokens para el razonamiento y la respuesta del modelo
 # ponytail: estimación fija de tokens; si el servidor rechaza por contexto, bajar este número.
 CHARS_POR_TOKEN = 2.5
+# ponytail: tope fijo; el proxy del servidor corta con 504 las llamadas largas (un trozo de ~100k tokens no terminaba).
+MAX_TROZO = 80_000  # caracteres por llamada al juez; bajarlo si vuelve a dar 504
 MAX_ARCHIVO = 80_000  # caracteres; un archivo completo más grande se manda solo como diff
 
 ESQUEMA = {
@@ -209,7 +211,7 @@ def evaluar_dia(cfg, gh, con, repo, dia, forzar=False, pesos_al=None):
     con_peso = {n for n, (p, _, _) in pesos.items() if p is not None}
     escala = "# Issues del proyecto (escala de pesos)\n" + (
         "".join(f"- #{n} [peso {pesos[n][0]}] {pesos[n][2]}\n" for n in sorted(con_peso)) or "(ninguno con peso)\n")
-    limite = int((cfg.llm_contexto - RESERVA_SALIDA) * CHARS_POR_TOKEN) - len(sistema) - len(escala)
+    limite = min(int((cfg.llm_contexto - RESERVA_SALIDA) * CHARS_POR_TOKEN), MAX_TROZO) - len(sistema) - len(escala)
     juicios, cache = [], {}
     for dev in sorted({f["dev"] for f in filas}):
         bloques, origen = [], {}
